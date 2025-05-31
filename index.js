@@ -1256,23 +1256,24 @@ app.get('/', (req, res) => {
             background-size: 400% 400%;
             animation: gradient-shift 8s ease infinite;
             min-height: 100vh; 
-            display: flex; 
-            align-items: center; 
-            justify-content: center; 
+            padding: 2rem 1rem;
         }
         @keyframes gradient-shift {
             0% { background-position: 0% 50%; }
             50% { background-position: 100% 50%; }
             100% { background-position: 0% 50%; }
         }
-        .container { 
+        .main-container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .hero-section { 
             background: white; 
             padding: 3rem; 
             border-radius: 20px; 
             box-shadow: 0 20px 60px rgba(0,0,0,0.1); 
             text-align: center; 
-            max-width: 600px; 
-            margin: 2rem;
+            margin-bottom: 3rem;
         }
         h1 { color: #333; margin-bottom: 1rem; font-size: 2.5rem; }
         p { color: #666; margin-bottom: 2rem; font-size: 1.2rem; line-height: 1.6; }
@@ -1302,6 +1303,7 @@ app.get('/', (req, res) => {
             background: #f8fafc; 
             border-radius: 10px; 
             transition: all 0.3s ease;
+            cursor: pointer;
         }
         .feature:hover {
             transform: translateY(-5px);
@@ -1326,69 +1328,509 @@ app.get('/', (req, res) => {
             50% { opacity: 0.5; }
             100% { opacity: 1; }
         }
+        
+        /* 聊天展示區域 */
+        .chat-demos {
+            background: white;
+            padding: 3rem;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.1);
+            margin-bottom: 3rem;
+        }
+        
+        .demo-tabs {
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-bottom: 2rem;
+            border-bottom: 2px solid #f0f0f0;
+        }
+        
+        .demo-tab {
+            padding: 0.8rem 1.5rem;
+            background: #f8fafc;
+            border: none;
+            border-radius: 20px 20px 0 0;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: 500;
+            color: #666;
+            font-size: 0.9rem;
+        }
+        
+        .demo-tab.active {
+            background: #00b900;
+            color: white;
+            transform: translateY(2px);
+        }
+        
+        .chat-container {
+            max-width: 400px;
+            margin: 0 auto;
+            background: #f8fafc;
+            border-radius: 20px;
+            padding: 1rem;
+            min-height: 500px;
+            position: relative;
+            border: 3px solid #ddd;
+        }
+        
+        .chat-header {
+            display: flex;
+            align-items: center;
+            padding: 1rem;
+            background: #00b900;
+            color: white;
+            border-radius: 15px 15px 0 0;
+            margin: -1rem -1rem 1rem -1rem;
+        }
+        
+        .chat-header img {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            margin-right: 1rem;
+            background: white;
+            padding: 5px;
+        }
+        
+        .chat-messages {
+            height: 400px;
+            overflow-y: auto;
+            padding: 0.5rem;
+        }
+        
+        .message {
+            margin: 1rem 0;
+            display: flex;
+            align-items: flex-end;
+            opacity: 0;
+            animation: messageAppear 0.5s ease forwards;
+        }
+        
+        .message.user {
+            justify-content: flex-end;
+        }
+        
+        .message.bot {
+            justify-content: flex-start;
+        }
+        
+        .message-bubble {
+            max-width: 80%;
+            padding: 0.8rem 1.2rem;
+            border-radius: 18px;
+            font-size: 0.9rem;
+            line-height: 1.4;
+            position: relative;
+        }
+        
+        .message.user .message-bubble {
+            background: #00b900;
+            color: white;
+            border-bottom-right-radius: 5px;
+        }
+        
+        .message.bot .message-bubble {
+            background: white;
+            color: #333;
+            border: 1px solid #e1e8ed;
+            border-bottom-left-radius: 5px;
+        }
+        
+        .message-time {
+            font-size: 0.7rem;
+            color: #999;
+            margin: 0 0.5rem;
+        }
+        
+        .typing-indicator {
+            display: none;
+            padding: 1rem;
+            margin: 1rem 0;
+        }
+        
+        .typing-dots {
+            display: inline-flex;
+            align-items: center;
+            padding: 0.8rem 1.2rem;
+            background: white;
+            border: 1px solid #e1e8ed;
+            border-radius: 18px;
+            border-bottom-left-radius: 5px;
+        }
+        
+        .typing-dots span {
+            width: 6px;
+            height: 6px;
+            background: #999;
+            border-radius: 50%;
+            margin: 0 2px;
+            animation: typing 1.5s infinite;
+        }
+        
+        .typing-dots span:nth-child(2) { animation-delay: 0.2s; }
+        .typing-dots span:nth-child(3) { animation-delay: 0.4s; }
+        
+        @keyframes typing {
+            0%, 60%, 100% { opacity: 0.3; }
+            30% { opacity: 1; }
+        }
+        
+        @keyframes messageAppear {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .demo-description {
+            text-align: center;
+            margin-bottom: 2rem;
+            color: #666;
+            font-size: 1.1rem;
+        }
+        
+        .flex-message-preview {
+            background: #f0f8ff;
+            border: 2px dashed #00b900;
+            border-radius: 15px;
+            padding: 1rem;
+            margin: 0.5rem 0;
+            font-size: 0.8rem;
+            color: #666;
+            text-align: center;
+        }
+        
+        @media (max-width: 768px) {
+            .hero-section, .chat-demos {
+                padding: 2rem 1.5rem;
+            }
+            h1 { font-size: 2rem; }
+            .demo-tabs {
+                gap: 0.2rem;
+            }
+            .demo-tab {
+                padding: 0.6rem 1rem;
+                font-size: 0.8rem;
+            }
+            .chat-container {
+                max-width: 100%;
+            }
+        }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>🌬️ 智慧空氣品質機器人</h1>
-        <p><span class="status-indicator"></span>服務正常運行中</p>
-        <p>即時監測空氣品質，守護您和家人的健康</p>
-        
-        <div style="margin: 2rem 0;">
-            <a href="https://line.me/R/ti/p/@470kdmxx" class="cta-button" target="_blank">
-                <i class="fab fa-line"></i> 立即加入好友
-            </a>
-            <a href="/health" class="cta-button" style="background: #42a5f5;">
-                🔧 服務狀態
-            </a>
+    <div class="main-container">
+        <!-- Hero Section -->
+        <div class="hero-section">
+            <h1>🌬️ 智慧空氣品質機器人</h1>
+            <p><span class="status-indicator"></span>服務正常運行中</p>
+            <p>即時監測空氣品質，守護您和家人的健康</p>
+            
+            <div style="margin: 2rem 0;">
+                <a href="https://line.me/R/ti/p/@470kdmxx" class="cta-button" target="_blank">
+                    <i class="fab fa-line"></i> 立即加入好友
+                </a>
+                <a href="/health" class="cta-button" style="background: #42a5f5;">
+                    🔧 服務狀態
+                </a>
+            </div>
+            
+            <div class="features">
+                <div class="feature" onclick="showDemo('query')">
+                    <i class="fas fa-search-location"></i>
+                    <h4>即時查詢</h4>
+                    <p>30+ 支援城市</p>
+                </div>
+                <div class="feature" onclick="showDemo('compare')">
+                    <i class="fas fa-chart-line"></i>
+                    <h4>多城市比較</h4>
+                    <p>智慧排序推薦</p>
+                </div>
+                <div class="feature" onclick="showDemo('health')">
+                    <i class="fas fa-user-md"></i>
+                    <h4>健康建議</h4>
+                    <p>專業防護指導</p>
+                </div>
+                <div class="feature" onclick="showDemo('subscribe')">
+                    <i class="fas fa-bell"></i>
+                    <h4>訂閱提醒</h4>
+                    <p>每日報告+警報</p>
+                </div>
+                <div class="feature" onclick="showDemo('location')">
+                    <i class="fas fa-map-marker-alt"></i>
+                    <h4>GPS定位</h4>
+                    <p>附近監測站查詢</p>
+                </div>
+                <div class="feature" onclick="showDemo('ai')">
+                    <i class="fas fa-robot"></i>
+                    <h4>AI智慧</h4>
+                    <p>自然語言理解</p>
+                </div>
+            </div>
         </div>
         
-        <div class="features">
-            <div class="feature">
-                <i class="fas fa-search-location"></i>
-                <h4>即時查詢</h4>
-                <p>30+ 支援城市</p>
+        <!-- Chat Demos Section -->
+        <div class="chat-demos">
+            <h2 style="text-align: center; margin-bottom: 2rem; color: #333;">💬 功能展示</h2>
+            <p class="demo-description">點擊上方功能卡片或下方標籤，查看真實對話範例</p>
+            
+            <div class="demo-tabs">
+                <button class="demo-tab active" onclick="showDemo('query')">🔍 即時查詢</button>
+                <button class="demo-tab" onclick="showDemo('compare')">📊 城市比較</button>
+                <button class="demo-tab" onclick="showDemo('health')">💊 健康建議</button>
+                <button class="demo-tab" onclick="showDemo('subscribe')">🔔 訂閱功能</button>
+                <button class="demo-tab" onclick="showDemo('location')">📍 GPS定位</button>
+                <button class="demo-tab" onclick="showDemo('ai')">🤖 AI智慧</button>
             </div>
-            <div class="feature">
-                <i class="fas fa-chart-line"></i>
-                <h4>多城市比較</h4>
-                <p>智慧排序推薦</p>
-            </div>
-            <div class="feature">
-                <i class="fas fa-user-md"></i>
-                <h4>健康建議</h4>
-                <p>專業防護指導</p>
-            </div>
-            <div class="feature">
-                <i class="fas fa-bell"></i>
-                <h4>訂閱提醒</h4>
-                <p>每日報告+警報</p>
-            </div>
-            <div class="feature">
-                <i class="fas fa-map-marker-alt"></i>
-                <h4>GPS定位</h4>
-                <p>附近監測站查詢</p>
-            </div>
-            <div class="feature">
-                <i class="fas fa-robot"></i>
-                <h4>AI智慧</h4>
-                <p>自然語言理解</p>
+            
+            <div class="chat-container">
+                <div class="chat-header">
+                    <img src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIHZpZXdCb3g9IjAgMCA0MCA0MCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPGNpcmNsZSBjeD0iMjAiIGN5PSIyMCIgcj0iMjAiIGZpbGw9IiMwMGI5MDAiLz4KPHRleHQgeD0iMjAiIHk9IjI2IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSJ3aGl0ZSIgZm9udC1zaXplPSIyMCI+8J+MrjwvdGV4dD4KPC9zdmc+" alt="Bot Avatar">
+                    <div>
+                        <div style="font-weight: bold;">智慧空氣品質機器人</div>
+                        <div style="font-size: 0.8rem; opacity: 0.9;">線上</div>
+                    </div>
+                </div>
+                <div class="chat-messages" id="chatMessages">
+                    <!-- Messages will be inserted here -->
+                </div>
+                <div class="typing-indicator" id="typingIndicator">
+                    <div class="typing-dots">
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                    </div>
+                </div>
             </div>
         </div>
         
-        <div style="margin-top: 2rem; padding-top: 2rem; border-top: 1px solid #eee;">
+        <!-- Quick Links -->
+        <div class="hero-section">
             <h3 style="color: #333; margin-bottom: 1rem;">🚀 快速測試</h3>
             <div style="display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap; font-size: 0.9rem;">
                 <a href="/api/air-quality/taipei" style="color: #00b900; text-decoration: none;">📡 台北空氣品質API</a>
                 <a href="/api/air-quality/kaohsiung" style="color: #00b900; text-decoration: none;">📡 高雄空氣品質API</a>
                 <a href="/debug" style="color: #666; text-decoration: none;">🔍 系統診斷</a>
             </div>
-        </div>
-        
-        <div style="margin-top: 2rem; padding-top: 1rem; border-top: 1px solid #eee; font-size: 0.85rem; color: #999;">
-            © 2025 智慧空氣品質機器人 | 用科技守護每一次呼吸 🌱
+            
+            <div style="margin-top: 2rem; padding-top: 1rem; border-top: 1px solid #eee; font-size: 0.85rem; color: #999;">
+                © 2025 智慧空氣品質機器人 | 用科技守護每一次呼吸 🌱
+            </div>
         </div>
     </div>
+
+<script>
+const demos = {
+    query: {
+        title: '🔍 即時空氣品質查詢',
+        description: '輸入城市名稱，立即獲得詳細的空氣品質報告',
+        messages: [
+            { type: 'user', text: '台北空氣品質', time: '14:30' },
+            { type: 'bot', text: '正在查詢台北的空氣品質數據...', time: '14:30', delay: 1000 },
+            { type: 'bot', content: 'flex', title: '台北空氣品質報告', 
+              preview: '🌬️ AQI: 65 (普通)\\n📍 台北市\\n😷 建議配戴一般口罩\\n🏃‍♂️ 適合散步、瑜伽', 
+              time: '14:31', delay: 2500 }
+        ]
+    },
+    compare: {
+        title: '📊 多城市空氣品質比較',
+        description: '一次比較多個城市，智慧排序推薦最佳選擇',
+        messages: [
+            { type: 'user', text: '比較台北高雄台中', time: '15:20' },
+            { type: 'bot', text: '正在比較三個城市的空氣品質...', time: '15:20', delay: 1000 },
+            { type: 'bot', content: 'flex', title: '🏆 多城市比較結果', 
+              preview: '🥇 台中 AQI: 45 (良好)\\n🥈 台北 AQI: 65 (普通)\\n🥉 高雄 AQI: 85 (普通)\\n\\n✈️ 推薦前往台中！', 
+              time: '15:21', delay: 3000 }
+        ]
+    },
+    health: {
+        title: '💊 專業健康建議',
+        description: '根據空氣品質提供個人化健康防護指導',
+        messages: [
+            { type: 'user', text: '高雄空氣品質', time: '16:45' },
+            { type: 'bot', content: 'flex', title: '高雄空氣品質報告', 
+              preview: '😰 AQI: 120 (不健康)\\n🚨 建議減少戶外活動\\n😷 必須配戴N95口罩\\n🏠 關閉門窗使用空氣清淨機', 
+              time: '16:46', delay: 2000 },
+            { type: 'user', text: '可以運動嗎？', time: '16:47' },
+            { type: 'bot', text: '目前高雄AQI為120，建議：\\n\\n🏠 僅建議室內輕度活動\\n🚫 避免戶外運動\\n💪 可在室內做瑜伽、伸展\\n⚠️ 敏感族群請特別注意', time: '16:47', delay: 1500 }
+        ]
+    },
+    subscribe: {
+        title: '🔔 訂閱提醒服務',
+        description: '每日推送空氣品質報告，惡化時立即警報',
+        messages: [
+            { type: 'user', text: '訂閱台北', time: '09:15' },
+            { type: 'bot', text: '✅ 已成功訂閱台北的空氣品質提醒！\\n\\n📅 每日 08:00 推送報告\\n🚨 AQI>100 時緊急警報\\n\\n輸入「我的訂閱」查看清單', time: '09:15', delay: 1000 },
+            { type: 'user', text: '我的訂閱', time: '09:16' },
+            { type: 'bot', text: '📋 您的訂閱清單：\\n\\n1. 台北\\n\\n⚙️ 設定：\\n• 📅 每日報告：已開啟\\n• 🚨 緊急警報：已開啟\\n• ⚠️ 警報閾值：AQI > 100', time: '09:16', delay: 1200 }
+        ]
+    },
+    location: {
+        title: '📍 GPS定位查詢',
+        description: '分享位置即可查詢附近監測站的空氣品質',
+        messages: [
+            { type: 'user', text: '[分享了位置]', time: '12:30', location: true },
+            { type: 'bot', text: '正在查找您附近的空氣品質監測站...', time: '12:30', delay: 1500 },
+            { type: 'bot', content: 'flex', title: '📍 附近監測站', 
+              preview: '1. 台北車站 (0.8km)\\n   AQI: 62 (普通)\\n\\n2. 中山站 (1.2km)\\n   AQI: 58 (普通)\\n\\n3. 西門站 (1.5km)\\n   AQI: 65 (普通)', 
+              time: '12:31', delay: 3000 }
+        ]
+    },
+    ai: {
+        title: '🤖 AI智慧對話',
+        description: '自然語言理解，支援多種靈活的查詢方式',
+        messages: [
+            { type: 'user', text: '今天適合出門嗎？我在台北', time: '08:30' },
+            { type: 'bot', text: '讓我查一下台北今天的空氣品質...', time: '08:30', delay: 1000 },
+            { type: 'bot', text: '台北今天AQI為65（普通等級）\\n\\n😊 適合出門！建議：\\n• 🚶‍♂️ 適合散步、輕度運動\\n• 😷 建議配戴一般口罩\\n• ⚠️ 敏感族群注意防護', time: '08:31', delay: 2500 },
+            { type: 'user', text: '謝謝！', time: '08:32' },
+            { type: 'bot', text: '不客氣！😊 隨時為您監測空氣品質。\\n如需其他城市資訊或想訂閱提醒，都可以告訴我喔～', time: '08:32', delay: 800 }
+        ]
+    }
+};
+
+let currentDemo = 'query';
+let messageIndex = 0;
+let isPlaying = false;
+
+function showDemo(demoKey) {
+    if (isPlaying) return;
+    
+    currentDemo = demoKey;
+    messageIndex = 0;
+    
+    // Update tab styles
+    document.querySelectorAll('.demo-tab').forEach(tab => {
+        tab.classList.remove('active');
+    });
+    event?.target?.classList.add('active') || 
+    document.querySelector(\`[onclick="showDemo('\${demoKey}')"]\`).classList.add('active');
+    
+    // Clear messages
+    const messagesContainer = document.getElementById('chatMessages');
+    messagesContainer.innerHTML = '';
+    
+    // Start playing messages
+    playDemo();
+}
+
+function playDemo() {
+    if (isPlaying) return;
+    isPlaying = true;
+    
+    const demo = demos[currentDemo];
+    const messagesContainer = document.getElementById('chatMessages');
+    const typingIndicator = document.getElementById('typingIndicator');
+    
+    function showNextMessage() {
+        if (messageIndex >= demo.messages.length) {
+            isPlaying = false;
+            return;
+        }
+        
+        const message = demo.messages[messageIndex];
+        const delay = message.delay || 0;
+        
+        // Show typing indicator for bot messages
+        if (message.type === 'bot' && delay > 500) {
+            typingIndicator.style.display = 'block';
+            setTimeout(() => {
+                typingIndicator.style.display = 'none';
+                addMessage(message);
+                messageIndex++;
+                setTimeout(showNextMessage, 500);
+            }, delay);
+        } else {
+            setTimeout(() => {
+                addMessage(message);
+                messageIndex++;
+                setTimeout(showNextMessage, 500);
+            }, delay);
+        }
+    }
+    
+    showNextMessage();
+}
+
+function addMessage(message) {
+    const messagesContainer = document.getElementById('chatMessages');
+    const messageDiv = document.createElement('div');
+    messageDiv.className = \`message \${message.type}\`;
+    
+    let messageContent = '';
+    
+    if (message.content === 'flex') {
+        messageContent = \`
+            <div class="message-bubble">
+                <div class="flex-message-preview">
+                    <strong>\${message.title}</strong><br>
+                    <div style="margin-top: 0.5rem; font-size: 0.75rem;">
+                        \${message.preview.replace(/\\\\n/g, '<br>')}
+                    </div>
+                </div>
+            </div>
+            <div class="message-time">\${message.time}</div>
+        \`;
+    } else if (message.location) {
+        messageContent = \`
+            <div class="message-bubble">
+                📍 位置資訊
+                <div style="margin-top: 0.5rem; padding: 0.5rem; background: rgba(0,0,0,0.1); border-radius: 8px; font-size: 0.8rem;">
+                    🗺️ 台北市中正區<br>
+                    📌 25.0478°N, 121.5319°E
+                </div>
+            </div>
+            <div class="message-time">\${message.time}</div>
+        \`;
+    } else {
+        messageContent = \`
+            <div class="message-bubble">\${message.text.replace(/\\\\n/g, '<br>')}</div>
+            <div class="message-time">\${message.time}</div>
+        \`;
+    }
+    
+    messageDiv.innerHTML = messageContent;
+    messagesContainer.appendChild(messageDiv);
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+}
+
+// Initialize with first demo
+document.addEventListener('DOMContentLoaded', function() {
+    setTimeout(() => showDemo('query'), 1000);
+});
+
+// Auto-cycle demos every 15 seconds when not manually controlled
+let autoCycleTimer;
+function startAutoCycle() {
+    const demoKeys = Object.keys(demos);
+    let currentIndex = 0;
+    
+    autoCycleTimer = setInterval(() => {
+        if (!isPlaying) {
+            currentIndex = (currentIndex + 1) % demoKeys.length;
+            showDemo(demoKeys[currentIndex]);
+        }
+    }, 15000);
+}
+
+// Start auto-cycle after initial load
+setTimeout(startAutoCycle, 10000);
+
+// Pause auto-cycle when user interacts
+document.querySelectorAll('.demo-tab, .feature').forEach(element => {
+    element.addEventListener('click', () => {
+        clearInterval(autoCycleTimer);
+        setTimeout(startAutoCycle, 30000); // Restart after 30 seconds
+    });
+});
+</script>
 </body>
 </html>
       `);
