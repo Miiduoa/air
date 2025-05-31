@@ -26,6 +26,38 @@ const client = new line.Client(config);
 let subscriptions = new Map(); // userId -> {cities: [], settings: {}}
 let locationCache = new Map(); // userId -> {lat, lng, timestamp}
 
+// 城市對應表
+const cityMap = {
+  '台北': 'taipei',
+  '台中': 'taichung',
+  '台南': 'tainan',
+  '高雄': 'kaohsiung',
+  '新北': 'new-taipei',
+  '桃園': 'taoyuan',
+  '基隆': 'keelung',
+  '新竹': 'hsinchu',
+  '苗栗': 'miaoli',
+  '彰化': 'changhua',
+  '南投': 'nantou',
+  '雲林': 'yunlin',
+  '嘉義': 'chiayi',
+  '屏東': 'pingtung',
+  '宜蘭': 'yilan',
+  '花蓮': 'hualien',
+  '台東': 'taitung',
+  '澎湖': 'penghu',
+  '金門': 'kinmen',
+  '馬祖': 'matsu',
+  '北京': 'beijing',
+  '上海': 'shanghai',
+  '東京': 'tokyo',
+  '首爾': 'seoul',
+  '曼谷': 'bangkok',
+  '新加坡': 'singapore',
+  '香港': 'hong-kong',
+  '澳門': 'macau'
+};
+
 // 計算兩點間距離（公里）
 function calculateDistance(lat1, lon1, lat2, lon2) {
   const R = 6371; // 地球半徑（公里）
@@ -101,6 +133,127 @@ function getUserSubscriptions(userId) {
   return subscriptions.get(userId) || { cities: [], settings: {} };
 }
 
+// 創建附近監測站Flex Message
+function createNearbyStationsFlexMessage(stations, userLat, userLng) {
+  if (stations.length === 0) {
+    return {
+      type: 'text',
+      text: '😔 抱歉，找不到您附近的空氣品質監測站。\n請嘗試查詢特定城市的空氣品質。'
+    };
+  }
+
+  const flexMessage = {
+    type: 'flex',
+    altText: `附近監測站 - 找到 ${stations.length} 個站點`,
+    contents: {
+      type: 'bubble',
+      styles: {
+        header: {
+          backgroundColor: '#4CAF50'
+        }
+      },
+      header: {
+        type: 'box',
+        layout: 'vertical',
+        contents: [
+          {
+            type: 'text',
+            text: '📍 附近空氣品質監測站',
+            weight: 'bold',
+            color: '#ffffff',
+            size: 'lg',
+            align: 'center'
+          }
+        ]
+      },
+      body: {
+        type: 'box',
+        layout: 'vertical',
+        contents: []
+      }
+    }
+  };
+
+  stations.forEach((station, index) => {
+    const aqiInfo = getAQILevel(station.aqi || 0);
+    const distanceText = station.distance < 1 ? 
+      `${Math.round(station.distance * 1000)}公尺` : 
+      `${station.distance.toFixed(1)}公里`;
+
+    flexMessage.contents.body.contents.push(
+      {
+        type: 'box',
+        layout: 'horizontal',
+        spacing: 'sm',
+        margin: index > 0 ? 'md' : 'none',
+        contents: [
+          {
+            type: 'text',
+            text: `${index + 1}`,
+            size: 'lg',
+            weight: 'bold',
+            flex: 1,
+            color: '#666666',
+            align: 'center'
+          },
+          {
+            type: 'box',
+            layout: 'vertical',
+            flex: 4,
+            contents: [
+              {
+                type: 'text',
+                text: station.station?.name || '未知站點',
+                weight: 'bold',
+                size: 'md',
+                color: '#333333',
+                wrap: true
+              },
+              {
+                type: 'text',
+                text: `距離: ${distanceText}`,
+                size: 'xs',
+                color: '#999999'
+              }
+            ]
+          },
+          {
+            type: 'box',
+            layout: 'vertical',
+            flex: 3,
+            contents: [
+              {
+                type: 'text',
+                text: `AQI ${station.aqi || 'N/A'}`,
+                weight: 'bold',
+                size: 'md',
+                color: aqiInfo.color,
+                align: 'end'
+              },
+              {
+                type: 'text',
+                text: aqiInfo.level,
+                size: 'xs',
+                color: '#666666',
+                align: 'end'
+              }
+            ]
+          }
+        ]
+      }
+    );
+
+    if (index < stations.length - 1) {
+      flexMessage.contents.body.contents.push({
+        type: 'separator',
+        margin: 'md'
+      });
+    }
+  });
+
+  return flexMessage;
+}
+
 // 每日定時推送空氣品質報告（每天早上8點）
 cron.schedule('0 8 * * *', async () => {
   console.log('開始發送每日空氣品質報告...');
@@ -148,35 +301,6 @@ cron.schedule('0 * * * *', async () => {
 }, {
   timezone: "Asia/Taipei"
 });
-  '台北': 'taipei',
-  '台中': 'taichung',
-  '台南': 'tainan',
-  '高雄': 'kaohsiung',
-  '新北': 'new-taipei',
-  '桃園': 'taoyuan',
-  '基隆': 'keelung',
-  '新竹': 'hsinchu',
-  '苗栗': 'miaoli',
-  '彰化': 'changhua',
-  '南投': 'nantou',
-  '雲林': 'yunlin',
-  '嘉義': 'chiayi',
-  '屏東': 'pingtung',
-  '宜蘭': 'yilan',
-  '花蓮': 'hualien',
-  '台東': 'taitung',
-  '澎湖': 'penghu',
-  '金門': 'kinmen',
-  '馬祖': 'matsu',
-  '北京': 'beijing',
-  '上海': 'shanghai',
-  '東京': 'tokyo',
-  '首爾': 'seoul',
-  '曼谷': 'bangkok',
-  '新加坡': 'singapore',
-  '香港': 'hong-kong',
-  '澳門': 'macau'
-};
 
 // AQI等級判斷
 function getAQILevel(aqi) {
@@ -351,6 +475,84 @@ async function getMultipleCitiesAirQuality(cities) {
     console.error('獲取多城市空氣品質數據錯誤:', error);
     throw error;
   }
+}
+
+// 創建每日報告Flex Message
+function createDailyReportFlexMessage(citiesData) {
+  const bestCity = citiesData.reduce((best, current) => 
+    current.aqi < best.aqi ? current : best
+  );
+  
+  return {
+    type: 'flex',
+    altText: `每日空氣品質報告 - 最佳: ${bestCity.chineseName}`,
+    contents: {
+      type: 'bubble',
+      header: {
+        type: 'box',
+        layout: 'vertical',
+        contents: [
+          {
+            type: 'text',
+            text: '🌅 每日空氣品質報告',
+            weight: 'bold',
+            color: '#ffffff',
+            size: 'lg'
+          }
+        ],
+        paddingAll: '20px',
+        backgroundColor: '#4CAF50',
+        spacing: 'md',
+        height: '60px'
+      },
+      body: {
+        type: 'box',
+        layout: 'vertical',
+        contents: citiesData.map(city => {
+          const aqiInfo = getAQILevel(city.aqi);
+          return {
+            type: 'box',
+            layout: 'horizontal',
+            contents: [
+              {
+                type: 'text',
+                text: city.chineseName,
+                weight: 'bold',
+                size: 'sm',
+                color: '#333333'
+              },
+              {
+                type: 'text',
+                text: `AQI ${city.aqi}`,
+                weight: 'bold',
+                size: 'sm',
+                color: aqiInfo.color,
+                align: 'end'
+              }
+            ],
+            margin: 'md'
+          };
+        })
+      }
+    }
+  };
+}
+
+// 創建緊急警報訊息
+function createEmergencyAlertMessage(airQualityData) {
+  const aqiInfo = getAQILevel(airQualityData.aqi);
+  
+  return {
+    type: 'text',
+    text: `🚨 空氣品質警報！\n\n` +
+          `📍 ${airQualityData.city.name}\n` +
+          `💨 AQI: ${airQualityData.aqi} (${aqiInfo.level})\n\n` +
+          `⚠️ 建議立即採取防護措施：\n` +
+          `• 避免戶外活動\n` +
+          `• 配戴N95口罩\n` +
+          `• 關閉門窗\n` +
+          `• 使用空氣清淨機`
+  };
 }
 
 // 創建Flex Message
@@ -1039,6 +1241,7 @@ app.get('/health', (req, res) => {
     status: 'OK', 
     message: 'LINE空氣品質機器人正常運行中！',
     timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
     features: [
       '即時空氣品質查詢',
       '多城市比較',

@@ -498,6 +498,28 @@
         @keyframes spin {
             to { transform: rotate(360deg); }
         }
+
+        @keyframes fireworkAnimation {
+            0% {
+                transform: scale(0) rotate(0deg);
+                opacity: 1;
+            }
+            50% {
+                transform: scale(1.5) rotate(180deg);
+                opacity: 0.8;
+            }
+            100% {
+                transform: scale(0) rotate(360deg);
+                opacity: 0;
+            }
+        }
+        
+        @keyframes fadeInOut {
+            0% { opacity: 0; transform: translate(-50%, -50%) scale(0.5); }
+            20% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+            80% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+            100% { opacity: 0; transform: translate(-50%, -50%) scale(0.5); }
+        }
     </style>
 </head>
 <body>
@@ -541,7 +563,7 @@
                     <div style="margin-top: 1rem; padding: 1rem; background: #f8fafc; border-radius: 10px; border-left: 4px solid #00e400;">
                         <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 0.5rem;">
                             <span style="font-size: 1.5rem;">🌍</span>
-                            <strong>35+ 支援城市</strong>
+                            <strong>30+ 支援城市</strong>
                         </div>
                         <div style="display: flex; align-items: center; gap: 10px;">
                             <span style="font-size: 1.5rem;">⚡</span>
@@ -701,15 +723,14 @@
             
             <div class="qr-container">
                 <div class="qr-code fade-in">
-                    <!-- 你的真實QR Code -->
-                    <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAASwAAAEsCAYAAAB5fY51AAAMUUlEQVR4Xu3dQW4cMQwEUf9/6RzAJxAgBJBkJJKdVUfbmBHfY2rJnj/++vz8/PvKP1iABYhA4BMsIuqJmQVY4AsWK7AACxCBgIBFRD0xs8AXLFZgARYgAgEBi4h6YmaBL1iswAIsQAQCAhYR9cTMAl+wWIEFWIAIBAQsIuqJmQW+YLECCxCDtj5qAQHrsJRFSj/2IVf8hwXG9L7kMgHrkJSARaiYvLaARSzkSgtYhIrJawtYxEKutIBFqJi8toBFLORKC1iEislrC1jEQq60gEWomLy2gEUs5EoLWISKyWsLWMRCrrSARaiYvLaARSzkSgtYhIrJawtYxEKutIBFqJi8toBFLORKC1iEislrC1jEQq60gEWomLy2gEUs5EoLWISKyWsLWMRCrrSARaiYvLaARSzkSgtYhIrJawtYxEKutIBFqJi8toBFLORKC1iEislrC1jEQq60gEWomLy2gEUs5EoLWISKyWsLWMRCrrSARaiYvLaARSzkSgtYhIrJawtYxEKutIBFqJi8toBFLORKC1iEislrC1jEQq60gEWomLy2gEUs5EoLWISKyWsLWMRCrrSARaiYvLaARSzkSgtYhIrJawtYxEKutIBFqJi8toBFLORKC1iEislrC1jEQq60gEWomLy2gEUs5EoLWISKyWsLWMRCrrSARaiYvLaARSzkSgtYhIrJawtYxEKutIBFqJi8toBFLORKC1iEislrC1jEQq60gEWomLy2gEUs5EoLWISKyWsLWMRCrrSARaiYvLaARSzkSgtYhIrJawtYxEKutIBFqJi8toBFLORKC1iEislrC1jEQq60gEWomLy2gEUs5EoLWISKyWsLWMRCrrSARaiYvLaARSzkSgtYhIrJawtYxEKutIBFqJi8toBFLORKC1iEislrC1jEQq60gEWomLy2gEUs5EoLWISKyWsLWMRCrrSARaiYvLaARSzkSgtYhIrJawtYxEKutIBFqJi8toBFLORKC1iEislrC1jEQq60gEWomLy2gEUs5EoLWISKyWsLWMRCrrSARaiYvLaARSzkSgtYhIrJawtYxEKutIBFqJi8toBFLORKC1iEislrC1jEQq60gEWomLy2gEUs5EoLWISKyWsLWMRCrrSARaiYvLaARSzkSgtYhIrJawtYxEKutIBFqJi8toBFLORKC1iEislrC1jEQq60gEWomLy2gEUs5EoLWISKyWsLWMRCrrSARaiYvLaARSzkSgtYhIrJawtYxEKutIBFqJi8toBFLORKC1iEislrC1jEQq60gEWomLy2gEUs5EoLWISKyWsLWMRCrrSARaiYvLaARSzkSgtYhIrJawtYxEKutIBFqJi8toBFLORKC1iEislrC1jEQq60gEWomLy2gEUs5EoLWISKyWsLWMRCrrSARaiYvLaARSzkSgtYhIrJawtYxEKutIBFqJi8toBFLORKC1iEislrC1jEQq60gEWomLy2gEUs5EoLWISKyWsLWMRCrrSARaiYvLaARSzkSgtYhIrJawtYxEKutIBFqJi8toBFLORKC1iEislrC1jEQq60gEWomLy2gEUs5EoLWISKyWsLWMRCrrSARaiYvLaARSzkSgtYhIrJawtYxEKutIBFqJi8toBFLORKC1iEislrC1jEQq60gEWomLy2gEUs5EoLWISKyWsLWMRCrrSARaiYvLaARSzkSgtYhIrJawtYxEKutIBFqJi8toBFLORKC1iEislrC1jEQq60gEWomLy2gEUs5EoLWISKyWsLWMRCrrSARaiYvLaARSzkSgtYhIrJawtYxEKutIBFqJi8toBFLORKC1iEislrC1jEQq60gEWomLy2gEUs5EoLWISKyWsLWMRCrrSARaiYvLaARSzkSgtYhIrJawtYxEKutIBFqJi8toBFLORKC1iEislrC1jEQq60gEWomLy2gEUs5EoLWISKyWsLWMRCrrSARaiYvLaARSzkSgtYhIrJawtYxEKutIBFqJi8toBFLORKC1iEislrC1jEQq60gEWomLy2gEUs5EoLWISKyWsLWMRCrrSARaiYvLaARSzkSgtYhIrJawtYxEKutIBFqJi8toBFLORKC1iEislrC1jEQq60gEWomLy2gEUs5EoLWISKyWsLWMRCrrSARaiYvLaARSzkSgtYhIrJawtYxEKutIBFqJi8toBFLORKC1iEislrC1jEQq60gEWomLy2gEUs5EoLWISKyWsLWMRCrrSARaiYvLaARSzkSgtYhIrJawtYxEKutIBFqJi8toBFLORKC1iEislrC1jEQq60gEWomLy2gEUs5EoLWISKyWsLWMRCrrSARaiYvLaARSzkSgtYhIrJawtYxEKutIBFqJi8toBFLORKC1iEislrC1jEQq60gEWomLy2gEUs5EoLWISKyWsLWMRCrrSARaiYvLaARSzkSgtYhIrJawtYxEKutIBFqJi8toBFLORKC1iEislrC1jEQq60gEWomLy2gEUs5EoLWISKyWsLWMRCrrSARaiYvLaARSzkSgtYhIrJawtYxEKutIBFqJi8toBFLORKC1iEislrC1jEQq60gEWomLy2gEUs5EoLWISKyWsLWMRCrrSARaiYvLaARSzkSgtYhIrJawtYxEKutIBFqJi8toBFLORKC1iEislrC1jEQq60gEWomLy2gEUs5EoLWISKyWsLWMRCrrSARaiYvLaARSzkSgtYhIrJawtYxEKutIBFqJi8toBFLORKC1iEislrC1jEQq60gEWomLy2gEUs5EoLWISKyWsLWMRCrrSARaiYvLaARSzkSgtYhIrJawtYxEKutIBFqJi8toBFLORKC1iEislrC1jEQq60gEWomLy2gEUs5EoLWISKyWsLWMRCrrSARaiYvLaARSzkSgtYhIrJawtYxEKutIBFqJi8toBFLORKC1iEislrC1jEQq60gEWomLy2gEUs5EoLWISKyWsLWMRCrrSARaiYvLaARSzkSgtYhIrJawtYxEKutIBFqJi8toBFLORKC1iEislrC1jEQq60gEWomLy2gEUs5EoLWISKyWsLWMRCrrSARaiYvLaARSzkSgtYhIrJawtYxEKutIBFqJi8toBFLORKC1iEislrC1jEQq60gEWomLy2gEUs5EoLWISKyWsLWMRCrrSARaiYvLaARSzkSgtYhIrJawtYxEKutIBFqJi8toBFLORKC1iEislrC1jEQq60gEWomLy2gEUs5EoLWISKyWsLWMRCrrSARaiYvLaARSzkSgtYhIrJawtYxEKutIBFqJi8toBFLORKC1iEislrC1jEQq60gEWomLy2gEUs5EoLWISKyWsLWMRCrrSARaiYvLaARSzkSgtYhIrJawtYxEKutIBFqJi8toBFLORKC1iEislrC1jEQq60gEWomLy2gEUs5EoLWISKyWsLWMRCrrSARaiYvLaARSzkSgtYhIrJawtYxEKutIBFqJi8toBFLORKC1iEislrC1jEQq60gEWomLy2gEUs5EoLWISKyWsLWMRCrrSARaiYvLaARSzkSgtYhIrJawtYxEKutIBFqJi8toBFLORKC1iEislrC1jEQq60gEWomLy2gEUs5EoLWISKyWsLWMRCrrSARaiYvLaARSzkSgtYhIrJawtYxEKutIBFqJi8toBFLORKC1iEislrC1jEQq60gEWomLy2gEUs5EoLWISKyWsLWMRCrrSARaiYvLaARSzkSgtYhIrJawtYxEKutIBFqJi8toBFLORKC1iEislrC1jEQq60gEWomLy2gEUs5EoLWISKyWsLWMRCrrSARaiYvLaARSzkSgtYhIrJawtYxEKutIBFqJi8toBFLORKC1iEislrC1jEQq60gEWomLy2gEUs5EoLWISKyWsLWMRCrrSARaiYvLaARSzkSgtYhIrJawtYxEKutIBFqJi8toBFLORKC1iEislrC1jEQq60gEWomLy2gEUs5EoLWISKyWsLWMRCrrSARaiYvLaARSzkSgtYhIrJawtYxEKutIBFqJi8toBFLORKC1iEislrC1jEQq60gEWomLy2gEUs5EoLWISKyWsLWMRCrrSARaiYvLaARSzkSgtYhIrJawtYxEKutIBFqJi8toBFLORKC1iEislrC1jEQq60gEWomLy2gEUs5EoLWISKyWsLWMRCrrSARaiYvLaARSzkSgtYhIrJawtYxEKutIBFqJi8toBFLORKC1iEislrC1jEQq60gEWomLy2gEUs5EoLWISKyWsLWMRCrrSARaiYvLaARSzkSgtYhIrJa/8Dg7lhXD+4BXYAAAAASUVORK5CYII=" alt="LINE Bot QR Code" style="width: 200px; height: 200px; border-radius: 10px;">
+                    <img src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICA8cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgZmlsbD0iI2Y4ZmFmYyIvPgogIDx0ZXh0IHg9IjEwMCIgeT0iMTAwIiBmb250LWZhbWlseT0iQXJpYWwsIHNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMTYiIGZpbGw9IiM2NjY2NjYiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIwLjNlbSI+UVIgQ29kZSDlnKjmraTlsIflvpfliqDlhaXvvIE8L3RleHQ+Cjwvc3ZnPgo=" alt="LINE Bot QR Code" style="width: 200px; height: 200px; border-radius: 10px;">
                 </div>
                 
                 <div class="qr-info fade-in">
                     <h3>🤖 立即加入好友</h3>
                     <p>掃描QR Code或點擊下方按鈕開始使用智慧空氣品質監測服務</p>
                     <div style="margin: 1rem 0;">
-                        <a href="https://line.me/R/ti/p/@your-bot-id" class="cta-button" target="_blank" style="display: inline-block;">
+                        <a href="https://line.me/R/ti/p/@470kdmxx" class="cta-button" target="_blank" style="display: inline-block;">
                             <i class="fab fa-line"></i> 加入LINE好友
                         </a>
                     </div>
@@ -770,7 +791,7 @@
                 <div class="social-links">
                     <a href="https://line.me/R/ti/p/@470kdmxx" target="_blank" title="LINE加好友"><i class="fab fa-line"></i></a>
                     <a href="#" onclick="showSurprise()" title="神秘驚喜"><i class="fab fa-github"></i></a>
-                    <a href="mailto:miiduoa@icloud.com" title="聯絡我們"><i class="fas fa-envelope"></i></a>
+                    <a href="mailto:support@airquality-bot.com" title="聯絡我們"><i class="fas fa-envelope"></i></a>
                 </div>
             </div>
             <p>&copy; 2025 智慧空氣品質機器人 | 用科技守護每一次呼吸 🌱</p>
@@ -843,7 +864,6 @@
         const statsObserver = new IntersectionObserver((entries) => {
             entries.forEach(entry => {
                 if (entry.isIntersecting) {
-                    // Animate numbers (simplified for demo)
                     setTimeout(() => {
                         document.getElementById('cities-count').innerHTML = '30+';
                         document.getElementById('features-count').innerHTML = '6';
@@ -862,7 +882,6 @@
 
         // Add some interactive features
         document.addEventListener('DOMContentLoaded', function() {
-            // Add hover effects to feature cards
             const featureCards = document.querySelectorAll('.feature-card');
             featureCards.forEach(card => {
                 card.addEventListener('mouseenter', function() {
@@ -874,11 +893,9 @@
                 });
             });
 
-            // Add click tracking for CTA button
             const ctaButton = document.querySelector('.cta-button');
             if (ctaButton) {
                 ctaButton.addEventListener('click', function() {
-                    // Analytics tracking could go here
                     console.log('CTA clicked');
                 });
             }
@@ -886,7 +903,6 @@
 
         // 友善的驚喜功能
         function showSurprise() {
-            // 創建彩色煙火效果
             const colors = ['#ff6b35', '#f7931e', '#ffd700', '#00e400', '#42a5f5', '#8f3f97'];
             
             for (let i = 0; i < 50; i++) {
@@ -913,7 +929,6 @@
                 }, i * 100);
             }
             
-            // 顯示祝賀訊息
             const message = document.createElement('div');
             message.innerHTML = '🎉 感謝你發現這個小彩蛋！<br/>希望你喜歡我們的空氣品質機器人！ 🌬️';
             message.style.position = 'fixed';
@@ -937,31 +952,6 @@
                 }
             }, 4000);
         }
-    </script>
-
-    <style>
-        @keyframes fireworkAnimation {
-            0% {
-                transform: scale(0) rotate(0deg);
-                opacity: 1;
-            }
-            50% {
-                transform: scale(1.5) rotate(180deg);
-                opacity: 0.8;
-            }
-            100% {
-                transform: scale(0) rotate(360deg);
-                opacity: 0;
-            }
-        }
-        
-        @keyframes fadeInOut {
-            0% { opacity: 0; transform: translate(-50%, -50%) scale(0.5); }
-            20% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
-            80% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
-            100% { opacity: 0; transform: translate(-50%, -50%) scale(0.5); }
-        }
-    </style>
     </script>
 </body>
 </html>
