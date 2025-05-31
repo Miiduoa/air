@@ -26,6 +26,7 @@ const client = new line.Client(config);
 // 訂閱管理（在實際部署中建議使用資料庫）
 let subscriptions = new Map(); // userId -> {cities: [], settings: {}}
 let locationCache = new Map(); // userId -> {lat, lng, timestamp}
+let userStates = new Map(); // userId -> {state: 'awaiting_city', context: {}}
 
 // 城市對應表
 const cityMap = {
@@ -58,6 +59,24 @@ const cityMap = {
   '香港': 'hong-kong',
   '澳門': 'macau'
 };
+
+// 用戶狀態管理
+function setUserState(userId, state, context = {}) {
+  userStates.set(userId, { state, context, timestamp: Date.now() });
+}
+
+function getUserState(userId) {
+  const userState = userStates.get(userId);
+  if (userState && Date.now() - userState.timestamp < 300000) { // 5分鐘過期
+    return userState;
+  }
+  userStates.delete(userId);
+  return null;
+}
+
+function clearUserState(userId) {
+  userStates.delete(userId);
+}
 
 // 計算兩點間距離（公里）
 function calculateDistance(lat1, lon1, lat2, lon2) {
@@ -130,129 +149,33 @@ function removeSubscription(userId, city) {
   return false;
 }
 
+function removeAllSubscriptions(userId) {
+  if (subscriptions.has(userId)) {
+    subscriptions.delete(userId);
+    return true;
+  }
+  return false;
+}
+
 function getUserSubscriptions(userId) {
   return subscriptions.get(userId) || { cities: [], settings: {} };
 }
 
-// 創建附近監測站Flex Message
-function createNearbyStationsFlexMessage(stations, userLat, userLng) {
-  if (stations.length === 0) {
-    return {
-      type: 'text',
-      text: '😔 抱歉，找不到您附近的空氣品質監測站。\n請嘗試查詢特定城市的空氣品質。'
-    };
+function updateUserSettings(userId, settings) {
+  if (!subscriptions.has(userId)) {
+    subscriptions.set(userId, {
+      cities: [],
+      settings: {
+        dailyReport: true,
+        emergencyAlert: true,
+        threshold: 100
+      }
+    });
   }
-
-  const flexMessage = {
-    type: 'flex',
-    altText: `附近監測站 - 找到 ${stations.length} 個站點`,
-    contents: {
-      type: 'bubble',
-      styles: {
-        header: {
-          backgroundColor: '#4CAF50'
-        }
-      },
-      header: {
-        type: 'box',
-        layout: 'vertical',
-        contents: [
-          {
-            type: 'text',
-            text: '📍 附近空氣品質監測站',
-            weight: 'bold',
-            color: '#ffffff',
-            size: 'lg',
-            align: 'center'
-          }
-        ]
-      },
-      body: {
-        type: 'box',
-        layout: 'vertical',
-        contents: []
-      }
-    }
-  };
-
-  stations.forEach((station, index) => {
-    const aqiInfo = getAQILevel(station.aqi || 0);
-    const distanceText = station.distance < 1 ? 
-      `${Math.round(station.distance * 1000)}公尺` : 
-      `${station.distance.toFixed(1)}公里`;
-
-    flexMessage.contents.body.contents.push(
-      {
-        type: 'box',
-        layout: 'horizontal',
-        spacing: 'sm',
-        margin: index > 0 ? 'md' : 'none',
-        contents: [
-          {
-            type: 'text',
-            text: `${index + 1}`,
-            size: 'lg',
-            weight: 'bold',
-            flex: 1,
-            color: '#666666',
-            align: 'center'
-          },
-          {
-            type: 'box',
-            layout: 'vertical',
-            flex: 4,
-            contents: [
-              {
-                type: 'text',
-                text: station.station?.name || '未知站點',
-                weight: 'bold',
-                size: 'md',
-                color: '#333333',
-                wrap: true
-              },
-              {
-                type: 'text',
-                text: `距離: ${distanceText}`,
-                size: 'xs',
-                color: '#999999'
-              }
-            ]
-          },
-          {
-            type: 'box',
-            layout: 'vertical',
-            flex: 3,
-            contents: [
-              {
-                type: 'text',
-                text: `AQI ${station.aqi || 'N/A'}`,
-                weight: 'bold',
-                size: 'md',
-                color: aqiInfo.color,
-                align: 'end'
-              },
-              {
-                type: 'text',
-                text: aqiInfo.level,
-                size: 'xs',
-                color: '#666666',
-                align: 'end'
-              }
-            ]
-          }
-        ]
-      }
-    );
-
-    if (index < stations.length - 1) {
-      flexMessage.contents.body.contents.push({
-        type: 'separator',
-        margin: 'md'
-      });
-    }
-  });
-
-  return flexMessage;
+  
+  const userSub = subscriptions.get(userId);
+  userSub.settings = { ...userSub.settings, ...settings };
+  return userSub.settings;
 }
 
 // 每日定時推送空氣品質報告（每天早上8點）
@@ -290,7 +213,7 @@ cron.schedule('0 * * * *', async () => {
           
           // 如果AQI超過用戶設定的閾值，發送警報
           if (airQualityData.aqi > subscription.settings.threshold) {
-            const alertMessage = createEmergencyAlertMessage(airQualityData);
+            const alertMessage = createEmergencyAlertFlexMessage(airQualityData);
             await client.pushMessage(userId, alertMessage);
           }
         }
@@ -383,12 +306,17 @@ function parseQuery(text) {
   
   // 檢查是否為取消訂閱
   if (text.includes('取消訂閱') || text.includes('unsubscribe')) {
-    return { type: 'unsubscribe', content: text };
+    return parseUnsubscribeQuery(text);
   }
   
   // 檢查是否為查看訂閱
   if (text.includes('我的訂閱') || text.includes('訂閱清單')) {
     return { type: 'list_subscriptions' };
+  }
+  
+  // 檢查是否為設定相關
+  if (text.includes('設定') || text.includes('settings')) {
+    return { type: 'settings' };
   }
   
   // 檢查是否為比較查詢
@@ -399,7 +327,7 @@ function parseQuery(text) {
   // 檢查是否包含城市名稱
   for (const [chinese, english] of Object.entries(cityMap)) {
     if (text.includes(chinese) || cleanText.includes(english)) {
-      return { type: 'single', city: english };
+      return { type: 'single', city: english, cityName: chinese };
     }
   }
   
@@ -415,6 +343,16 @@ function parseSubscribeQuery(text) {
     }
   }
   return { type: 'subscribe', city: null };
+}
+
+// 解析取消訂閱查詢
+function parseUnsubscribeQuery(text) {
+  for (const [chinese, english] of Object.entries(cityMap)) {
+    if (text.includes(chinese)) {
+      return { type: 'unsubscribe', city: english, cityName: chinese };
+    }
+  }
+  return { type: 'unsubscribe', city: null };
 }
 
 // 解析比較查詢
@@ -478,6 +416,680 @@ async function getMultipleCitiesAirQuality(cities) {
   }
 }
 
+// 創建主選單Flex Message
+function createMainMenuFlexMessage() {
+  return {
+    type: 'flex',
+    altText: '主選單 - 智慧空氣品質機器人',
+    contents: {
+      type: 'bubble',
+      header: {
+        type: 'box',
+        layout: 'vertical',
+        contents: [
+          {
+            type: 'text',
+            text: '🌬️ 智慧空氣品質機器人',
+            weight: 'bold',
+            color: '#ffffff',
+            size: 'lg',
+            align: 'center'
+          },
+          {
+            type: 'text',
+            text: '請選擇您需要的功能',
+            color: '#ffffff',
+            size: 'sm',
+            align: 'center',
+            margin: 'sm'
+          }
+        ],
+        backgroundColor: '#4CAF50',
+        paddingAll: '20px'
+      },
+      body: {
+        type: 'box',
+        layout: 'vertical',
+        spacing: 'md',
+        contents: [
+          {
+            type: 'box',
+            layout: 'horizontal',
+            spacing: 'sm',
+            contents: [
+              {
+                type: 'button',
+                style: 'primary',
+                color: '#42a5f5',
+                action: {
+                  type: 'message',
+                  label: '🔍 查詢空氣品質',
+                  text: '查詢空氣品質'
+                },
+                flex: 1
+              },
+              {
+                type: 'button',
+                style: 'primary',
+                color: '#ff7e00',
+                action: {
+                  type: 'message',
+                  label: '📊 比較城市',
+                  text: '比較城市'
+                },
+                flex: 1
+              }
+            ]
+          },
+          {
+            type: 'box',
+            layout: 'horizontal',
+            spacing: 'sm',
+            contents: [
+              {
+                type: 'button',
+                style: 'primary',
+                color: '#8f3f97',
+                action: {
+                  type: 'message',
+                  label: '🔔 訂閱提醒',
+                  text: '訂閱提醒'
+                },
+                flex: 1
+              },
+              {
+                type: 'button',
+                style: 'primary',
+                color: '#00e400',
+                action: {
+                  type: 'message',
+                  label: '📍 附近查詢',
+                  text: '附近查詢'
+                },
+                flex: 1
+              }
+            ]
+          },
+          {
+            type: 'button',
+            style: 'secondary',
+            action: {
+              type: 'message',
+              label: '⚙️ 我的設定',
+              text: '我的設定'
+            }
+          }
+        ]
+      },
+      footer: {
+        type: 'box',
+        layout: 'vertical',
+        spacing: 'sm',
+        contents: [
+          {
+            type: 'separator'
+          },
+          {
+            type: 'text',
+            text: '💡 直接輸入城市名稱也可快速查詢',
+            color: '#aaaaaa',
+            size: 'xs',
+            align: 'center',
+            margin: 'sm'
+          }
+        ]
+      }
+    }
+  };
+}
+
+// 創建城市選擇Flex Message
+function createCitySelectionFlexMessage() {
+  return {
+    type: 'flex',
+    altText: '選擇城市 - 空氣品質查詢',
+    contents: {
+      type: 'carousel',
+      contents: [
+        {
+          type: 'bubble',
+          header: {
+            type: 'box',
+            layout: 'vertical',
+            contents: [
+              {
+                type: 'text',
+                text: '🏙️ 台灣主要城市',
+                weight: 'bold',
+                color: '#ffffff',
+                align: 'center'
+              }
+            ],
+            backgroundColor: '#4CAF50',
+            paddingAll: '15px'
+          },
+          body: {
+            type: 'box',
+            layout: 'vertical',
+            spacing: 'sm',
+            contents: [
+              {
+                type: 'button',
+                action: {
+                  type: 'message',
+                  label: '台北',
+                  text: '台北空氣品質'
+                },
+                color: '#42a5f5'
+              },
+              {
+                type: 'button',
+                action: {
+                  type: 'message',
+                  label: '台中',
+                  text: '台中空氣品質'
+                },
+                color: '#42a5f5'
+              },
+              {
+                type: 'button',
+                action: {
+                  type: 'message',
+                  label: '台南',
+                  text: '台南空氣品質'
+                },
+                color: '#42a5f5'
+              },
+              {
+                type: 'button',
+                action: {
+                  type: 'message',
+                  label: '高雄',
+                  text: '高雄空氣品質'
+                },
+                color: '#42a5f5'
+              }
+            ]
+          }
+        },
+        {
+          type: 'bubble',
+          header: {
+            type: 'box',
+            layout: 'vertical',
+            contents: [
+              {
+                type: 'text',
+                text: '🌏 國際城市',
+                weight: 'bold',
+                color: '#ffffff',
+                align: 'center'
+              }
+            ],
+            backgroundColor: '#ff7e00',
+            paddingAll: '15px'
+          },
+          body: {
+            type: 'box',
+            layout: 'vertical',
+            spacing: 'sm',
+            contents: [
+              {
+                type: 'button',
+                action: {
+                  type: 'message',
+                  label: '東京',
+                  text: '東京空氣品質'
+                },
+                color: '#ff7e00'
+              },
+              {
+                type: 'button',
+                action: {
+                  type: 'message',
+                  label: '首爾',
+                  text: '首爾空氣品質'
+                },
+                color: '#ff7e00'
+              },
+              {
+                type: 'button',
+                action: {
+                  type: 'message',
+                  label: '新加坡',
+                  text: '新加坡空氣品質'
+                },
+                color: '#ff7e00'
+              },
+              {
+                type: 'button',
+                action: {
+                  type: 'message',
+                  label: '香港',
+                  text: '香港空氣品質'
+                },
+                color: '#ff7e00'
+              }
+            ]
+          }
+        },
+        {
+          type: 'bubble',
+          header: {
+            type: 'box',
+            layout: 'vertical',
+            contents: [
+              {
+                type: 'text',
+                text: '🆚 多城市比較',
+                weight: 'bold',
+                color: '#ffffff',
+                align: 'center'
+              }
+            ],
+            backgroundColor: '#8f3f97',
+            paddingAll: '15px'
+          },
+          body: {
+            type: 'box',
+            layout: 'vertical',
+            spacing: 'sm',
+            contents: [
+              {
+                type: 'button',
+                action: {
+                  type: 'message',
+                  label: '台北 vs 高雄',
+                  text: '比較台北高雄'
+                },
+                color: '#8f3f97'
+              },
+              {
+                type: 'button',
+                action: {
+                  type: 'message',
+                  label: '台灣五大城市',
+                  text: '比較台北台中台南高雄新北'
+                },
+                color: '#8f3f97'
+              },
+              {
+                type: 'button',
+                action: {
+                  type: 'message',
+                  label: '自訂比較',
+                  text: '自訂城市比較'
+                },
+                color: '#8f3f97'
+              },
+              {
+                type: 'button',
+                action: {
+                  type: 'location',
+                  label: '📍 附近查詢'
+                }
+              }
+            ]
+          }
+        }
+      ]
+    }
+  };
+}
+
+// 創建訂閱管理Flex Message
+function createSubscriptionManagementFlexMessage(userId) {
+  const userSub = getUserSubscriptions(userId);
+  const hasSubscriptions = userSub.cities.length > 0;
+  
+  const flexMessage = {
+    type: 'flex',
+    altText: '訂閱管理 - 空氣品質提醒',
+    contents: {
+      type: 'bubble',
+      header: {
+        type: 'box',
+        layout: 'vertical',
+        contents: [
+          {
+            type: 'text',
+            text: '🔔 訂閱管理',
+            weight: 'bold',
+            color: '#ffffff',
+            size: 'lg',
+            align: 'center'
+          }
+        ],
+        backgroundColor: '#8f3f97',
+        paddingAll: '20px'
+      },
+      body: {
+        type: 'box',
+        layout: 'vertical',
+        spacing: 'md',
+        contents: []
+      }
+    }
+  };
+
+  if (hasSubscriptions) {
+    // 顯示當前訂閱
+    flexMessage.contents.body.contents.push(
+      {
+        type: 'text',
+        text: '📋 您的訂閱清單：',
+        weight: 'bold',
+        color: '#333333',
+        margin: 'md'
+      }
+    );
+
+    userSub.cities.forEach((city, index) => {
+      const chinese = Object.keys(cityMap).find(key => cityMap[key] === city) || city;
+      flexMessage.contents.body.contents.push({
+        type: 'box',
+        layout: 'horizontal',
+        spacing: 'sm',
+        margin: 'sm',
+        contents: [
+          {
+            type: 'text',
+            text: `${index + 1}. ${chinese}`,
+            flex: 3,
+            color: '#666666'
+          },
+          {
+            type: 'button',
+            action: {
+              type: 'message',
+              label: '取消',
+              text: `取消訂閱${chinese}`
+            },
+            style: 'secondary',
+            height: 'sm',
+            flex: 1
+          }
+        ]
+      });
+    });
+
+    // 顯示設定
+    flexMessage.contents.body.contents.push(
+      {
+        type: 'separator',
+        margin: 'lg'
+      },
+      {
+        type: 'text',
+        text: '⚙️ 目前設定：',
+        weight: 'bold',
+        color: '#333333',
+        margin: 'md'
+      },
+      {
+        type: 'text',
+        text: `📅 每日報告：${userSub.settings.dailyReport ? '開啟' : '關閉'}`,
+        size: 'sm',
+        color: '#666666',
+        margin: 'sm'
+      },
+      {
+        type: 'text',
+        text: `🚨 緊急警報：${userSub.settings.emergencyAlert ? '開啟' : '關閉'}`,
+        size: 'sm',
+        color: '#666666',
+        margin: 'xs'
+      },
+      {
+        type: 'text',
+        text: `⚠️ 警報閾值：AQI > ${userSub.settings.threshold}`,
+        size: 'sm',
+        color: '#666666',
+        margin: 'xs'
+      }
+    );
+  } else {
+    flexMessage.contents.body.contents.push({
+      type: 'text',
+      text: '您目前沒有訂閱任何城市',
+      color: '#666666',
+      align: 'center',
+      margin: 'lg'
+    });
+  }
+
+  // 添加操作按鈕
+  flexMessage.contents.body.contents.push(
+    {
+      type: 'separator',
+      margin: 'lg'
+    },
+    {
+      type: 'box',
+      layout: 'vertical',
+      spacing: 'sm',
+      margin: 'lg',
+      contents: [
+        {
+          type: 'button',
+          style: 'primary',
+          color: '#4CAF50',
+          action: {
+            type: 'message',
+            label: '➕ 新增訂閱',
+            text: '新增訂閱'
+          }
+        },
+        {
+          type: 'button',
+          style: 'secondary',
+          action: {
+            type: 'message',
+            label: '⚙️ 修改設定',
+            text: '修改設定'
+          }
+        }
+      ]
+    }
+  );
+
+  if (hasSubscriptions) {
+    flexMessage.contents.body.contents[flexMessage.contents.body.contents.length - 1].contents.push({
+      type: 'button',
+      style: 'secondary',
+      action: {
+        type: 'message',
+        label: '🗑️ 清除所有訂閱',
+        text: '清除所有訂閱'
+      }
+    });
+  }
+
+  return flexMessage;
+}
+
+// 創建設定Flex Message
+function createSettingsFlexMessage(userId) {
+  const userSub = getUserSubscriptions(userId);
+  
+  return {
+    type: 'flex',
+    altText: '個人設定 - 智慧空氣品質機器人',
+    contents: {
+      type: 'bubble',
+      header: {
+        type: 'box',
+        layout: 'vertical',
+        contents: [
+          {
+            type: 'text',
+            text: '⚙️ 個人設定',
+            weight: 'bold',
+            color: '#ffffff',
+            size: 'lg',
+            align: 'center'
+          }
+        ],
+        backgroundColor: '#666666',
+        paddingAll: '20px'
+      },
+      body: {
+        type: 'box',
+        layout: 'vertical',
+        spacing: 'md',
+        contents: [
+          {
+            type: 'text',
+            text: '📅 每日報告',
+            weight: 'bold',
+            color: '#333333'
+          },
+          {
+            type: 'box',
+            layout: 'horizontal',
+            spacing: 'sm',
+            contents: [
+              {
+                type: 'button',
+                style: userSub.settings.dailyReport ? 'primary' : 'secondary',
+                action: {
+                  type: 'message',
+                  label: '開啟',
+                  text: '開啟每日報告'
+                },
+                flex: 1
+              },
+              {
+                type: 'button',
+                style: !userSub.settings.dailyReport ? 'primary' : 'secondary',
+                action: {
+                  type: 'message',
+                  label: '關閉',
+                  text: '關閉每日報告'
+                },
+                flex: 1
+              }
+            ]
+          },
+          {
+            type: 'separator',
+            margin: 'lg'
+          },
+          {
+            type: 'text',
+            text: '🚨 緊急警報',
+            weight: 'bold',
+            color: '#333333',
+            margin: 'lg'
+          },
+          {
+            type: 'box',
+            layout: 'horizontal',
+            spacing: 'sm',
+            contents: [
+              {
+                type: 'button',
+                style: userSub.settings.emergencyAlert ? 'primary' : 'secondary',
+                action: {
+                  type: 'message',
+                  label: '開啟',
+                  text: '開啟緊急警報'
+                },
+                flex: 1
+              },
+              {
+                type: 'button',
+                style: !userSub.settings.emergencyAlert ? 'primary' : 'secondary',
+                action: {
+                  type: 'message',
+                  label: '關閉',
+                  text: '關閉緊急警報'
+                },
+                flex: 1
+              }
+            ]
+          },
+          {
+            type: 'separator',
+            margin: 'lg'
+          },
+          {
+            type: 'text',
+            text: '⚠️ 警報閾值設定',
+            weight: 'bold',
+            color: '#333333',
+            margin: 'lg'
+          },
+          {
+            type: 'text',
+            text: `目前閾值：AQI > ${userSub.settings.threshold}`,
+            color: '#666666',
+            size: 'sm',
+            margin: 'sm'
+          },
+          {
+            type: 'box',
+            layout: 'horizontal',
+            spacing: 'sm',
+            contents: [
+              {
+                type: 'button',
+                style: userSub.settings.threshold === 50 ? 'primary' : 'secondary',
+                action: {
+                  type: 'message',
+                  label: '50',
+                  text: '設定警報閾值50'
+                },
+                flex: 1
+              },
+              {
+                type: 'button',
+                style: userSub.settings.threshold === 100 ? 'primary' : 'secondary',
+                action: {
+                  type: 'message',
+                  label: '100',
+                  text: '設定警報閾值100'
+                },
+                flex: 1
+              },
+              {
+                type: 'button',
+                style: userSub.settings.threshold === 150 ? 'primary' : 'secondary',
+                action: {
+                  type: 'message',
+                  label: '150',
+                  text: '設定警報閾值150'
+                },
+                flex: 1
+              }
+            ]
+          }
+        ]
+      },
+      footer: {
+        type: 'box',
+        layout: 'vertical',
+        spacing: 'sm',
+        contents: [
+          {
+            type: 'separator'
+          },
+          {
+            type: 'button',
+            style: 'secondary',
+            action: {
+              type: 'message',
+              label: '↩️ 回到主選單',
+              text: '主選單'
+            },
+            margin: 'sm'
+          }
+        ]
+      }
+    }
+  };
+}
+
 // 創建每日報告Flex Message
 function createDailyReportFlexMessage(citiesData) {
   const bestCity = citiesData.reduce((best, current) => 
@@ -498,65 +1110,431 @@ function createDailyReportFlexMessage(citiesData) {
             text: '🌅 每日空氣品質報告',
             weight: 'bold',
             color: '#ffffff',
-            size: 'lg'
+            size: 'lg',
+            align: 'center'
+          },
+          {
+            type: 'text',
+            text: new Date().toLocaleDateString('zh-TW'),
+            color: '#ffffff',
+            size: 'sm',
+            align: 'center',
+            margin: 'sm'
           }
         ],
         paddingAll: '20px',
-        backgroundColor: '#4CAF50',
-        spacing: 'md',
-        height: '60px'
+        backgroundColor: '#4CAF50'
       },
       body: {
         type: 'box',
         layout: 'vertical',
-        contents: citiesData.map(city => {
-          const aqiInfo = getAQILevel(city.aqi);
-          return {
-            type: 'box',
-            layout: 'horizontal',
-            contents: [
-              {
-                type: 'text',
-                text: city.chineseName,
-                weight: 'bold',
-                size: 'sm',
-                color: '#333333'
-              },
-              {
-                type: 'text',
-                text: `AQI ${city.aqi}`,
-                weight: 'bold',
-                size: 'sm',
-                color: aqiInfo.color,
-                align: 'end'
-              }
-            ],
-            margin: 'md'
-          };
-        })
+        contents: [
+          {
+            type: 'text',
+            text: '📊 今日空氣品質排名',
+            weight: 'bold',
+            color: '#333333',
+            margin: 'lg'
+          },
+          ...citiesData.map((city, index) => {
+            const aqiInfo = getAQILevel(city.aqi);
+            const rankEmoji = ['🥇', '🥈', '🥉', '4️⃣', '5️⃣'][index] || `${index + 1}️⃣`;
+            
+            return {
+              type: 'box',
+              layout: 'horizontal',
+              contents: [
+                {
+                  type: 'text',
+                  text: rankEmoji,
+                  flex: 1,
+                  align: 'center'
+                },
+                {
+                  type: 'text',
+                  text: city.chineseName,
+                  weight: 'bold',
+                  size: 'sm',
+                  color: '#333333',
+                  flex: 3
+                },
+                {
+                  type: 'text',
+                  text: `AQI ${city.aqi}`,
+                  weight: 'bold',
+                  size: 'sm',
+                  color: aqiInfo.color,
+                  align: 'end',
+                  flex: 2
+                }
+              ],
+              margin: 'md'
+            };
+          }),
+          {
+            type: 'separator',
+            margin: 'lg'
+          },
+          {
+            type: 'text',
+            text: `🏆 今日推薦：${bestCity.chineseName}`,
+            weight: 'bold',
+            color: '#4CAF50',
+            align: 'center',
+            margin: 'lg'
+          }
+        ]
+      },
+      footer: {
+        type: 'box',
+        layout: 'vertical',
+        spacing: 'sm',
+        contents: [
+          {
+            type: 'separator'
+          },
+          {
+            type: 'text',
+            text: '💡 點擊任一城市可查看詳細資訊',
+            color: '#aaaaaa',
+            size: 'xs',
+            align: 'center',
+            margin: 'sm'
+          }
+        ]
       }
     }
   };
 }
 
-// 創建緊急警報訊息
-function createEmergencyAlertMessage(airQualityData) {
+// 創建緊急警報Flex Message
+function createEmergencyAlertFlexMessage(airQualityData) {
   const aqiInfo = getAQILevel(airQualityData.aqi);
+  const healthAdvice = getHealthAdvice(airQualityData.aqi);
   
   return {
-    type: 'text',
-    text: `🚨 空氣品質警報！\n\n` +
-          `📍 ${airQualityData.city.name}\n` +
-          `💨 AQI: ${airQualityData.aqi} (${aqiInfo.level})\n\n` +
-          `⚠️ 建議立即採取防護措施：\n` +
-          `• 避免戶外活動\n` +
-          `• 配戴N95口罩\n` +
-          `• 關閉門窗\n` +
-          `• 使用空氣清淨機`
+    type: 'flex',
+    altText: `🚨 空氣品質警報 - ${airQualityData.city.name}`,
+    contents: {
+      type: 'bubble',
+      header: {
+        type: 'box',
+        layout: 'vertical',
+        contents: [
+          {
+            type: 'text',
+            text: '🚨 空氣品質警報',
+            weight: 'bold',
+            color: '#ffffff',
+            size: 'lg',
+            align: 'center'
+          },
+          {
+            type: 'text',
+            text: '請立即採取防護措施',
+            color: '#ffffff',
+            size: 'sm',
+            align: 'center',
+            margin: 'sm'
+          }
+        ],
+        backgroundColor: '#ff0000',
+        paddingAll: '20px'
+      },
+      body: {
+        type: 'box',
+        layout: 'vertical',
+        spacing: 'md',
+        contents: [
+          {
+            type: 'box',
+            layout: 'horizontal',
+            contents: [
+              {
+                type: 'text',
+                text: '📍 地點',
+                color: '#aaaaaa',
+                size: 'sm',
+                flex: 2
+              },
+              {
+                type: 'text',
+                text: airQualityData.city.name,
+                color: '#333333',
+                size: 'sm',
+                flex: 3
+              }
+            ]
+          },
+          {
+            type: 'box',
+            layout: 'horizontal',
+            contents: [
+              {
+                type: 'text',
+                text: '💨 AQI',
+                color: '#aaaaaa',
+                size: 'sm',
+                flex: 2
+              },
+              {
+                type: 'text',
+                text: `${airQualityData.aqi} (${aqiInfo.level})`,
+                color: aqiInfo.color,
+                size: 'lg',
+                weight: 'bold',
+                flex: 3
+              }
+            ]
+          },
+          {
+            type: 'separator',
+            margin: 'lg'
+          },
+          {
+            type: 'text',
+            text: '🚨 緊急建議',
+            weight: 'bold',
+            color: '#ff0000',
+            margin: 'lg'
+          },
+          {
+            type: 'text',
+            text: healthAdvice.mask,
+            size: 'sm',
+            color: '#333333',
+            margin: 'sm'
+          },
+          {
+            type: 'text',
+            text: healthAdvice.indoor,
+            size: 'sm',
+            color: '#333333',
+            margin: 'xs'
+          },
+          {
+            type: 'text',
+            text: healthAdvice.exercise,
+            size: 'sm',
+            color: '#333333',
+            margin: 'xs'
+          }
+        ]
+      },
+      footer: {
+        type: 'box',
+        layout: 'vertical',
+        spacing: 'sm',
+        contents: [
+          {
+            type: 'separator'
+          },
+          {
+            type: 'button',
+            style: 'primary',
+            color: '#4CAF50',
+            action: {
+              type: 'message',
+              label: '查看詳細資訊',
+              text: `${airQualityData.city.name}空氣品質`
+            },
+            margin: 'sm'
+          }
+        ]
+      }
+    }
   };
 }
 
-// 創建Flex Message
+// 創建附近監測站Flex Message
+function createNearbyStationsFlexMessage(stations, userLat, userLng) {
+  if (stations.length === 0) {
+    return {
+      type: 'flex',
+      altText: '附近監測站查詢結果',
+      contents: {
+        type: 'bubble',
+        header: {
+          type: 'box',
+          layout: 'vertical',
+          contents: [
+            {
+              type: 'text',
+              text: '📍 附近監測站',
+              weight: 'bold',
+              color: '#ffffff',
+              size: 'lg',
+              align: 'center'
+            }
+          ],
+          backgroundColor: '#ff7e00',
+          paddingAll: '20px'
+        },
+        body: {
+          type: 'box',
+          layout: 'vertical',
+          contents: [
+            {
+              type: 'text',
+              text: '😔 抱歉，找不到您附近的空氣品質監測站',
+              color: '#666666',
+              align: 'center',
+              margin: 'lg',
+              wrap: true
+            },
+            {
+              type: 'text',
+              text: '請嘗試查詢特定城市的空氣品質',
+              color: '#aaaaaa',
+              size: 'sm',
+              align: 'center',
+              margin: 'md',
+              wrap: true
+            }
+          ]
+        },
+        footer: {
+          type: 'box',
+          layout: 'vertical',
+          spacing: 'sm',
+          contents: [
+            {
+              type: 'separator'
+            },
+            {
+              type: 'button',
+              style: 'primary',
+              action: {
+                type: 'message',
+                label: '🔍 選擇城市查詢',
+                text: '查詢空氣品質'
+              },
+              margin: 'sm'
+            }
+          ]
+        }
+      }
+    };
+  }
+
+  const flexMessage = {
+    type: 'flex',
+    altText: `附近監測站 - 找到 ${stations.length} 個站點`,
+    contents: {
+      type: 'bubble',
+      header: {
+        type: 'box',
+        layout: 'vertical',
+        contents: [
+          {
+            type: 'text',
+            text: '📍 附近空氣品質監測站',
+            weight: 'bold',
+            color: '#ffffff',
+            size: 'lg',
+            align: 'center'
+          },
+          {
+            type: 'text',
+            text: `找到 ${stations.length} 個監測站`,
+            color: '#ffffff',
+            size: 'sm',
+            align: 'center',
+            margin: 'sm'
+          }
+        ],
+        backgroundColor: '#4CAF50',
+        paddingAll: '20px'
+      },
+      body: {
+        type: 'box',
+        layout: 'vertical',
+        contents: []
+      }
+    }
+  };
+
+  stations.forEach((station, index) => {
+    const aqiInfo = getAQILevel(station.aqi || 0);
+    const distanceText = station.distance < 1 ? 
+      `${Math.round(station.distance * 1000)}公尺` : 
+      `${station.distance.toFixed(1)}公里`;
+
+    flexMessage.contents.body.contents.push(
+      {
+        type: 'box',
+        layout: 'horizontal',
+        spacing: 'sm',
+        margin: index > 0 ? 'md' : 'lg',
+        contents: [
+          {
+            type: 'text',
+            text: `${index + 1}`,
+            size: 'lg',
+            weight: 'bold',
+            flex: 1,
+            color: '#666666',
+            align: 'center'
+          },
+          {
+            type: 'box',
+            layout: 'vertical',
+            flex: 4,
+            contents: [
+              {
+                type: 'text',
+                text: station.station?.name || '未知站點',
+                weight: 'bold',
+                size: 'md',
+                color: '#333333',
+                wrap: true
+              },
+              {
+                type: 'text',
+                text: `📏 距離: ${distanceText}`,
+                size: 'xs',
+                color: '#999999'
+              }
+            ]
+          },
+          {
+            type: 'box',
+            layout: 'vertical',
+            flex: 3,
+            contents: [
+              {
+                type: 'text',
+                text: `AQI ${station.aqi || 'N/A'}`,
+                weight: 'bold',
+                size: 'md',
+                color: aqiInfo.color,
+                align: 'end'
+              },
+              {
+                type: 'text',
+                text: aqiInfo.level,
+                size: 'xs',
+                color: '#666666',
+                align: 'end'
+              }
+            ]
+          }
+        ]
+      }
+    );
+
+    if (index < stations.length - 1) {
+      flexMessage.contents.body.contents.push({
+        type: 'separator',
+        margin: 'md'
+      });
+    }
+  });
+
+  return flexMessage;
+}
+
+// 創建空氣品質Flex Message
 function createAirQualityFlexMessage(data) {
   const aqiInfo = getAQILevel(data.aqi);
   const healthAdvice = getHealthAdvice(data.aqi);
@@ -574,11 +1552,6 @@ function createAirQualityFlexMessage(data) {
     altText: `${data.city.name} 空氣品質 AQI: ${data.aqi}`,
     contents: {
       type: 'bubble',
-      styles: {
-        header: {
-          backgroundColor: aqiInfo.color
-        }
-      },
       header: {
         type: 'box',
         layout: 'vertical',
@@ -591,7 +1564,9 @@ function createAirQualityFlexMessage(data) {
             size: 'lg',
             align: 'center'
           }
-        ]
+        ],
+        backgroundColor: aqiInfo.color,
+        paddingAll: '20px'
       },
       body: {
         type: 'box',
@@ -610,7 +1585,7 @@ function createAirQualityFlexMessage(data) {
                 contents: [
                   {
                     type: 'text',
-                    text: '城市',
+                    text: '📍 城市',
                     color: '#aaaaaa',
                     size: 'sm',
                     flex: 2
@@ -632,7 +1607,7 @@ function createAirQualityFlexMessage(data) {
                 contents: [
                   {
                     type: 'text',
-                    text: 'AQI',
+                    text: '💨 AQI',
                     color: '#aaaaaa',
                     size: 'sm',
                     flex: 2
@@ -655,7 +1630,7 @@ function createAirQualityFlexMessage(data) {
                 contents: [
                   {
                     type: 'text',
-                    text: '等級',
+                    text: '📊 等級',
                     color: '#aaaaaa',
                     size: 'sm',
                     flex: 2
@@ -729,6 +1704,52 @@ function createAirQualityFlexMessage(data) {
             ]
           }
         ]
+      },
+      footer: {
+        type: 'box',
+        layout: 'vertical',
+        spacing: 'sm',
+        contents: [
+          {
+            type: 'separator'
+          },
+          {
+            type: 'box',
+            layout: 'horizontal',
+            spacing: 'sm',
+            margin: 'sm',
+            contents: [
+              {
+                type: 'button',
+                style: 'secondary',
+                action: {
+                  type: 'message',
+                  label: '🔔 訂閱提醒',
+                  text: `訂閱${data.city.name}`
+                },
+                flex: 1
+              },
+              {
+                type: 'button',
+                style: 'secondary',
+                action: {
+                  type: 'message',
+                  label: '🆚 比較城市',
+                  text: '比較城市'
+                },
+                flex: 1
+              }
+            ]
+          },
+          {
+            type: 'text',
+            text: `更新時間: ${updateTime}`,
+            color: '#aaaaaa',
+            size: 'xs',
+            align: 'center',
+            margin: 'sm'
+          }
+        ]
       }
     }
   };
@@ -772,72 +1793,7 @@ function createAirQualityFlexMessage(data) {
     });
   }
 
-  // 添加更新時間
-  flexMessage.contents.footer = {
-    type: 'box',
-    layout: 'vertical',
-    spacing: 'sm',
-    contents: [
-      {
-        type: 'separator'
-      },
-      {
-        type: 'text',
-        text: `更新時間: ${updateTime}`,
-        color: '#aaaaaa',
-        size: 'xs',
-        align: 'center',
-        margin: 'sm'
-      }
-    ]
-  };
-
   return flexMessage;
-}
-
-// 創建城市選擇快速回覆
-function createCityQuickReply() {
-  const popularCities = ['台北', '台中', '台南', '高雄', '新北', '桃園'];
-  
-  return {
-    type: 'text',
-    text: '請選擇要查詢的城市，或直接輸入城市名稱：\n\n💡 功能提示：\n• 查詢：「台北空氣品質」\n• 比較：「比較台北高雄」\n• 訂閱：「訂閱台北」\n• 定位：直接分享位置',
-    quickReply: {
-      items: [
-        ...popularCities.map(city => ({
-          type: 'action',
-          action: {
-            type: 'message',
-            label: city,
-            text: `查詢${city}空氣品質`
-          }
-        })),
-        {
-          type: 'action',
-          action: {
-            type: 'message',
-            label: '比較城市',
-            text: '比較台北台中高雄'
-          }
-        },
-        {
-          type: 'action',
-          action: {
-            type: 'message',
-            label: '我的訂閱',
-            text: '我的訂閱清單'
-          }
-        },
-        {
-          type: 'action',
-          action: {
-            type: 'location',
-            label: '分享位置'
-          }
-        }
-      ]
-    }
-  };
 }
 
 // 創建多城市比較Flex Message
@@ -855,11 +1811,6 @@ function createCityComparisonFlexMessage(citiesData) {
     altText: `多城市空氣品質比較 - 最佳: ${bestCity.chineseName} AQI: ${bestCity.aqi}`,
     contents: {
       type: 'bubble',
-      styles: {
-        header: {
-          backgroundColor: '#4CAF50'
-        }
-      },
       header: {
         type: 'box',
         layout: 'vertical',
@@ -871,8 +1822,18 @@ function createCityComparisonFlexMessage(citiesData) {
             color: '#ffffff',
             size: 'lg',
             align: 'center'
+          },
+          {
+            type: 'text',
+            text: `共比較 ${sortedCities.length} 個城市`,
+            color: '#ffffff',
+            size: 'sm',
+            align: 'center',
+            margin: 'sm'
           }
-        ]
+        ],
+        backgroundColor: '#4CAF50',
+        paddingAll: '20px'
       },
       body: {
         type: 'box',
@@ -885,6 +1846,27 @@ function createCityComparisonFlexMessage(citiesData) {
             size: 'md',
             margin: 'lg',
             color: '#333333'
+          }
+        ]
+      },
+      footer: {
+        type: 'box',
+        layout: 'vertical',
+        spacing: 'sm',
+        contents: [
+          {
+            type: 'separator'
+          },
+          {
+            type: 'button',
+            style: 'primary',
+            color: '#4CAF50',
+            action: {
+              type: 'message',
+              label: `查看 ${bestCity.chineseName} 詳細資訊`,
+              text: `${bestCity.chineseName}空氣品質`
+            },
+            margin: 'sm'
           }
         ]
       }
@@ -994,36 +1976,362 @@ function createCityComparisonFlexMessage(citiesData) {
     }
   );
 
-  // 添加更新時間
-  const updateTime = new Date().toLocaleString('zh-TW', {
-    timeZone: 'Asia/Taipei',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit'
-  });
+  return flexMessage;
+}
 
-  flexMessage.contents.footer = {
-    type: 'box',
-    layout: 'vertical',
-    spacing: 'sm',
-    contents: [
-      {
-        type: 'separator'
+// 創建歡迎訊息Flex Message
+function createWelcomeFlexMessage() {
+  return {
+    type: 'flex',
+    altText: '歡迎使用智慧空氣品質機器人',
+    contents: {
+      type: 'bubble',
+      hero: {
+        type: 'image',
+        url: 'https://via.placeholder.com/1040x585/4CAF50/FFFFFF?text=%F0%9F%8C%AC%EF%B8%8F+%E6%99%BA%E6%85%A7%E7%A9%BA%E6%B0%A3%E5%93%81%E8%B3%AA%E6%A9%9F%E5%99%A8%E4%BA%BA',
+        size: 'full',
+        aspectRatio: '1040:585',
+        aspectMode: 'cover'
       },
-      {
-        type: 'text',
-        text: `更新時間: ${updateTime}`,
-        color: '#aaaaaa',
-        size: 'xs',
-        align: 'center',
-        margin: 'sm'
+      body: {
+        type: 'box',
+        layout: 'vertical',
+        spacing: 'md',
+        contents: [
+          {
+            type: 'text',
+            text: '🌟 歡迎使用智慧空氣品質機器人！',
+            weight: 'bold',
+            size: 'lg',
+            color: '#333333',
+            align: 'center'
+          },
+          {
+            type: 'text',
+            text: '您的專屬空氣品質監測助手',
+            size: 'md',
+            color: '#666666',
+            align: 'center',
+            margin: 'sm'
+          },
+          {
+            type: 'separator',
+            margin: 'lg'
+          },
+          {
+            type: 'text',
+            text: '✨ 主要功能',
+            weight: 'bold',
+            color: '#333333',
+            margin: 'lg'
+          },
+          {
+            type: 'text',
+            text: '🔍 即時空氣品質查詢\n📊 多城市比較分析\n💊 專業健康建議\n🔔 智慧訂閱提醒\n📍 GPS定位查詢',
+            size: 'sm',
+            color: '#666666',
+            margin: 'sm',
+            wrap: true
+          }
+        ]
+      },
+      footer: {
+        type: 'box',
+        layout: 'vertical',
+        spacing: 'sm',
+        contents: [
+          {
+            type: 'button',
+            style: 'primary',
+            color: '#4CAF50',
+            action: {
+              type: 'message',
+              label: '🚀 開始使用',
+              text: '主選單'
+            }
+          },
+          {
+            type: 'button',
+            style: 'secondary',
+            action: {
+              type: 'message',
+              label: '💡 使用教學',
+              text: '使用說明'
+            }
+          }
+        ]
       }
-    ]
+    }
+  };
+}
+
+// 創建使用說明Flex Message
+function createHelpFlexMessage() {
+  return {
+    type: 'flex',
+    altText: '使用說明 - 智慧空氣品質機器人',
+    contents: {
+      type: 'carousel',
+      contents: [
+        {
+          type: 'bubble',
+          header: {
+            type: 'box',
+            layout: 'vertical',
+            contents: [
+              {
+                type: 'text',
+                text: '🔍 查詢功能',
+                weight: 'bold',
+                color: '#ffffff',
+                size: 'lg',
+                align: 'center'
+              }
+            ],
+            backgroundColor: '#42a5f5',
+            paddingAll: '20px'
+          },
+          body: {
+            type: 'box',
+            layout: 'vertical',
+            spacing: 'md',
+            contents: [
+              {
+                type: 'text',
+                text: '📱 使用方式',
+                weight: 'bold',
+                color: '#333333'
+              },
+              {
+                type: 'text',
+                text: '• 直接輸入城市名稱\n• 點擊主選單按鈕\n• 分享位置查詢附近站點',
+                size: 'sm',
+                color: '#666666',
+                wrap: true
+              },
+              {
+                type: 'text',
+                text: '📝 範例',
+                weight: 'bold',
+                color: '#333333',
+                margin: 'lg'
+              },
+              {
+                type: 'text',
+                text: '「台北空氣品質」\n「東京空氣品質」\n「比較台北高雄」',
+                size: 'sm',
+                color: '#666666',
+                wrap: true
+              }
+            ]
+          }
+        },
+        {
+          type: 'bubble',
+          header: {
+            type: 'box',
+            layout: 'vertical',
+            contents: [
+              {
+                type: 'text',
+                text: '🔔 訂閱功能',
+                weight: 'bold',
+                color: '#ffffff',
+                size: 'lg',
+                align: 'center'
+              }
+            ],
+            backgroundColor: '#8f3f97',
+            paddingAll: '20px'
+          },
+          body: {
+            type: 'box',
+            layout: 'vertical',
+            spacing: 'md',
+            contents: [
+              {
+                type: 'text',
+                text: '📅 自動推送',
+                weight: 'bold',
+                color: '#333333'
+              },
+              {
+                type: 'text',
+                text: '• 每日08:00空氣品質報告\n• 空氣品質惡化警報\n• 個人化健康建議',
+                size: 'sm',
+                color: '#666666',
+                wrap: true
+              },
+              {
+                type: 'text',
+                text: '⚙️ 個人設定',
+                weight: 'bold',
+                color: '#333333',
+                margin: 'lg'
+              },
+              {
+                type: 'text',
+                text: '• 調整警報閾值\n• 開關推送功能\n• 管理訂閱城市',
+                size: 'sm',
+                color: '#666666',
+                wrap: true
+              }
+            ]
+          }
+        },
+        {
+          type: 'bubble',
+          header: {
+            type: 'box',
+            layout: 'vertical',
+            contents: [
+              {
+                type: 'text',
+                text: '💊 健康建議',
+                weight: 'bold',
+                color: '#ffffff',
+                size: 'lg',
+                align: 'center'
+              }
+            ],
+            backgroundColor: '#ff7e00',
+            paddingAll: '20px'
+          },
+          body: {
+            type: 'box',
+            layout: 'vertical',
+            spacing: 'md',
+            contents: [
+              {
+                type: 'text',
+                text: '🏥 專業建議',
+                weight: 'bold',
+                color: '#333333'
+              },
+              {
+                type: 'text',
+                text: '• 6級AQI健康分級\n• 運動建議\n• 口罩配戴建議\n• 室內空氣管理',
+                size: 'sm',
+                color: '#666666',
+                wrap: true
+              },
+              {
+                type: 'text',
+                text: '👥 族群分類',
+                weight: 'bold',
+                color: '#333333',
+                margin: 'lg'
+              },
+              {
+                type: 'text',
+                text: '• 一般民眾\n• 敏感族群\n• 孕婦及兒童\n• 老年人',
+                size: 'sm',
+                color: '#666666',
+                wrap: true
+              }
+            ]
+          }
+        }
+      ]
+    }
+  };
+}
+
+// 創建錯誤訊息Flex Message
+function createErrorFlexMessage(errorType, message) {
+  const errorConfig = {
+    'not_found': {
+      emoji: '🤔',
+      title: '無法識別',
+      color: '#ff7e00'
+    },
+    'api_error': {
+      emoji: '😵',
+      title: '查詢錯誤',
+      color: '#ff0000'
+    },
+    'network_error': {
+      emoji: '🌐',
+      title: '網路錯誤',
+      color: '#ff0000'
+    }
   };
 
-  return flexMessage;
+  const config = errorConfig[errorType] || errorConfig['api_error'];
+
+  return {
+    type: 'flex',
+    altText: `錯誤 - ${config.title}`,
+    contents: {
+      type: 'bubble',
+      header: {
+        type: 'box',
+        layout: 'vertical',
+        contents: [
+          {
+            type: 'text',
+            text: `${config.emoji} ${config.title}`,
+            weight: 'bold',
+            color: '#ffffff',
+            size: 'lg',
+            align: 'center'
+          }
+        ],
+        backgroundColor: config.color,
+        paddingAll: '20px'
+      },
+      body: {
+        type: 'box',
+        layout: 'vertical',
+        spacing: 'md',
+        contents: [
+          {
+            type: 'text',
+            text: message,
+            color: '#666666',
+            align: 'center',
+            wrap: true,
+            margin: 'lg'
+          },
+          {
+            type: 'text',
+            text: '💡 建議嘗試：',
+            weight: 'bold',
+            color: '#333333',
+            margin: 'lg'
+          },
+          {
+            type: 'text',
+            text: '• 重新輸入查詢\n• 使用主選單功能\n• 嘗試其他城市名稱',
+            size: 'sm',
+            color: '#666666',
+            wrap: true
+          }
+        ]
+      },
+      footer: {
+        type: 'box',
+        layout: 'vertical',
+        spacing: 'sm',
+        contents: [
+          {
+            type: 'separator'
+          },
+          {
+            type: 'button',
+            style: 'primary',
+            color: '#4CAF50',
+            action: {
+              type: 'message',
+              label: '↩️ 回到主選單',
+              text: '主選單'
+            },
+            margin: 'sm'
+          }
+        ]
+      }
+    }
+  };
 }
 
 // 處理LINE訊息
@@ -1046,10 +2354,7 @@ async function handleEvent(event) {
       return client.replyMessage(event.replyToken, flexMessage);
     } catch (error) {
       console.error('處理位置訊息錯誤:', error);
-      const errorMessage = {
-        type: 'text',
-        text: '😵 查詢附近空氣品質時發生錯誤，請稍後再試。'
-      };
+      const errorMessage = createErrorFlexMessage('api_error', '查詢附近空氣品質時發生錯誤，請稍後再試。');
       return client.replyMessage(event.replyToken, errorMessage);
     }
   }
@@ -1062,28 +2367,381 @@ async function handleEvent(event) {
   const userMessage = event.message.text;
   
   try {
-    // 檢查是否為問候語或幫助指令
-    if (userMessage.match(/^(你好|哈囉|hello|hi|幫助|help|使用說明)/i)) {
-      const helpMessage = {
-        type: 'text',
-        text: '🌟 歡迎使用智慧空氣品質機器人！\n\n' +
-              '📋 查詢功能：\n' +
-              '• 單城市：「台北空氣品質」\n' +
-              '• 多城市比較：「比較台北高雄台中」\n' +
-              '• 附近查詢：直接分享位置\n\n' +
-              '🔔 訂閱功能：\n' +
-              '• 訂閱城市：「訂閱台北」\n' +
-              '• 查看訂閱：「我的訂閱」\n' +
-              '• 取消訂閱：「取消訂閱台北」\n\n' +
-              '✨ 智慧功能：\n' +
-              '• 📊 專業健康建議\n' +
-              '• 🌅 每日定時報告\n' +
-              '• 🚨 空氣品質警報\n' +
-              '• 📍 GPS定位查詢\n\n' +
-              '🌍 支援台灣各縣市及國際主要城市'
+    // 檢查用戶狀態
+    const userState = getUserState(userId);
+    
+    // 處理有狀態的對話
+    if (userState) {
+      return await handleStatefulMessage(event, userState);
+    }
+    
+    // 檢查是否為問候語或主選單
+    if (userMessage.match(/^(你好|哈囉|hello|hi|主選單|menu)/i)) {
+      const welcomeMessage = createWelcomeFlexMessage();
+      const menuMessage = createMainMenuFlexMessage();
+      return client.replyMessage(event.replyToken, [welcomeMessage, menuMessage]);
+    }
+
+    // 檢查是否為幫助指令
+    if (userMessage.match(/^(幫助|help|使用說明|教學)/i)) {
+      const helpMessage = createHelpFlexMessage();
+      return client.replyMessage(event.replyToken, helpMessage);
+    }
+
+    // 檢查是否為設定相關功能
+    if (userMessage.match(/^(我的設定|設定|settings)/i)) {
+      const settingsMessage = createSettingsFlexMessage(userId);
+      return client.replyMessage(event.replyToken, settingsMessage);
+    }
+
+    // 處理設定相關指令
+    if (userMessage.includes('開啟每日報告') || userMessage.includes('關閉每日報告')) {
+      const enable = userMessage.includes('開啟');
+      updateUserSettings(userId, { dailyReport: enable });
+      
+      const confirmMessage = {
+        type: 'flex',
+        altText: `每日報告已${enable ? '開啟' : '關閉'}`,
+        contents: {
+          type: 'bubble',
+          body: {
+            type: 'box',
+            layout: 'vertical',
+            contents: [
+              {
+                type: 'text',
+                text: `✅ 每日報告已${enable ? '開啟' : '關閉'}`,
+                weight: 'bold',
+                color: '#4CAF50',
+                align: 'center'
+              }
+            ]
+          },
+          footer: {
+            type: 'box',
+            layout: 'vertical',
+            spacing: 'sm',
+            contents: [
+              {
+                type: 'button',
+                style: 'secondary',
+                action: {
+                  type: 'message',
+                  label: '↩️ 回到設定',
+                  text: '我的設定'
+                }
+              }
+            ]
+          }
+        }
       };
       
-      return client.replyMessage(event.replyToken, [helpMessage, createCityQuickReply()]);
+      return client.replyMessage(event.replyToken, confirmMessage);
+    }
+
+    if (userMessage.includes('開啟緊急警報') || userMessage.includes('關閉緊急警報')) {
+      const enable = userMessage.includes('開啟');
+      updateUserSettings(userId, { emergencyAlert: enable });
+      
+      const confirmMessage = {
+        type: 'flex',
+        altText: `緊急警報已${enable ? '開啟' : '關閉'}`,
+        contents: {
+          type: 'bubble',
+          body: {
+            type: 'box',
+            layout: 'vertical',
+            contents: [
+              {
+                type: 'text',
+                text: `✅ 緊急警報已${enable ? '開啟' : '關閉'}`,
+                weight: 'bold',
+                color: '#4CAF50',
+                align: 'center'
+              }
+            ]
+          },
+          footer: {
+            type: 'box',
+            layout: 'vertical',
+            spacing: 'sm',
+            contents: [
+              {
+                type: 'button',
+                style: 'secondary',
+                action: {
+                  type: 'message',
+                  label: '↩️ 回到設定',
+                  text: '我的設定'
+                }
+              }
+            ]
+          }
+        }
+      };
+      
+      return client.replyMessage(event.replyToken, confirmMessage);
+    }
+
+    if (userMessage.includes('設定警報閾值')) {
+      const thresholdMatch = userMessage.match(/設定警報閾值(\d+)/);
+      if (thresholdMatch) {
+        const threshold = parseInt(thresholdMatch[1]);
+        updateUserSettings(userId, { threshold });
+        
+        const confirmMessage = {
+          type: 'flex',
+          altText: `警報閾值已設定為 ${threshold}`,
+          contents: {
+            type: 'bubble',
+            body: {
+              type: 'box',
+              layout: 'vertical',
+              contents: [
+                {
+                  type: 'text',
+                  text: `✅ 警報閾值已設定為 AQI > ${threshold}`,
+                  weight: 'bold',
+                  color: '#4CAF50',
+                  align: 'center',
+                  wrap: true
+                }
+              ]
+            },
+            footer: {
+              type: 'box',
+              layout: 'vertical',
+              spacing: 'sm',
+              contents: [
+                {
+                  type: 'button',
+                  style: 'secondary',
+                  action: {
+                    type: 'message',
+                    label: '↩️ 回到設定',
+                    text: '我的設定'
+                  }
+                }
+              ]
+            }
+          }
+        };
+        
+        return client.replyMessage(event.replyToken, confirmMessage);
+      }
+    }
+
+    // 處理主選單功能
+    if (userMessage === '查詢空氣品質') {
+      const citySelectionMessage = createCitySelectionFlexMessage();
+      return client.replyMessage(event.replyToken, citySelectionMessage);
+    }
+
+    if (userMessage === '比較城市') {
+      setUserState(userId, 'awaiting_compare_cities');
+      const instructionMessage = {
+        type: 'flex',
+        altText: '多城市比較 - 請輸入城市',
+        contents: {
+          type: 'bubble',
+          header: {
+            type: 'box',
+            layout: 'vertical',
+            contents: [
+              {
+                type: 'text',
+                text: '🆚 多城市比較',
+                weight: 'bold',
+                color: '#ffffff',
+                size: 'lg',
+                align: 'center'
+              }
+            ],
+            backgroundColor: '#8f3f97',
+            paddingAll: '20px'
+          },
+          body: {
+            type: 'box',
+            layout: 'vertical',
+            spacing: 'md',
+            contents: [
+              {
+                type: 'text',
+                text: '請輸入要比較的城市名稱',
+                color: '#333333',
+                align: 'center',
+                weight: 'bold'
+              },
+              {
+                type: 'text',
+                text: '📝 範例格式：',
+                color: '#666666',
+                margin: 'lg'
+              },
+              {
+                type: 'text',
+                text: '• 台北 高雄\n• 台北 台中 台南\n• 東京 首爾 新加坡',
+                size: 'sm',
+                color: '#666666',
+                wrap: true
+              }
+            ]
+          },
+          footer: {
+            type: 'box',
+            layout: 'vertical',
+            spacing: 'sm',
+            contents: [
+              {
+                type: 'separator'
+              },
+              {
+                type: 'button',
+                style: 'secondary',
+                action: {
+                  type: 'message',
+                  label: '❌ 取消',
+                  text: '主選單'
+                },
+                margin: 'sm'
+              }
+            ]
+          }
+        }
+      };
+      return client.replyMessage(event.replyToken, instructionMessage);
+    }
+
+    if (userMessage === '訂閱提醒') {
+      const subscriptionMessage = createSubscriptionManagementFlexMessage(userId);
+      return client.replyMessage(event.replyToken, subscriptionMessage);
+    }
+
+    if (userMessage === '附近查詢') {
+      const locationMessage = {
+        type: 'flex',
+        altText: 'GPS定位查詢',
+        contents: {
+          type: 'bubble',
+          header: {
+            type: 'box',
+            layout: 'vertical',
+            contents: [
+              {
+                type: 'text',
+                text: '📍 GPS定位查詢',
+                weight: 'bold',
+                color: '#ffffff',
+                size: 'lg',
+                align: 'center'
+              }
+            ],
+            backgroundColor: '#00e400',
+            paddingAll: '20px'
+          },
+          body: {
+            type: 'box',
+            layout: 'vertical',
+            spacing: 'md',
+            contents: [
+              {
+                type: 'text',
+                text: '請分享您的位置',
+                color: '#333333',
+                align: 'center',
+                weight: 'bold'
+              },
+              {
+                type: 'text',
+                text: '我們會為您找到最近的空氣品質監測站',
+                size: 'sm',
+                color: '#666666',
+                align: 'center',
+                wrap: true,
+                margin: 'md'
+              }
+            ]
+          },
+          footer: {
+            type: 'box',
+            layout: 'vertical',
+            spacing: 'sm',
+            contents: [
+              {
+                type: 'button',
+                style: 'primary',
+                color: '#00e400',
+                action: {
+                  type: 'location',
+                  label: '📍 分享位置'
+                }
+              },
+              {
+                type: 'button',
+                style: 'secondary',
+                action: {
+                  type: 'message',
+                  label: '❌ 取消',
+                  text: '主選單'
+                }
+              }
+            ]
+          }
+        }
+      };
+      return client.replyMessage(event.replyToken, locationMessage);
+    }
+
+    if (userMessage === '新增訂閱') {
+      setUserState(userId, 'awaiting_subscribe_city');
+      const citySelectionMessage = createCitySelectionFlexMessage();
+      return client.replyMessage(event.replyToken, citySelectionMessage);
+    }
+
+    if (userMessage === '修改設定') {
+      const settingsMessage = createSettingsFlexMessage(userId);
+      return client.replyMessage(event.replyToken, settingsMessage);
+    }
+
+    if (userMessage === '清除所有訂閱') {
+      const success = removeAllSubscriptions(userId);
+      const confirmMessage = {
+        type: 'flex',
+        altText: success ? '已清除所有訂閱' : '清除失敗',
+        contents: {
+          type: 'bubble',
+          body: {
+            type: 'box',
+            layout: 'vertical',
+            contents: [
+              {
+                type: 'text',
+                text: success ? '✅ 已清除所有訂閱' : '❌ 您目前沒有任何訂閱',
+                weight: 'bold',
+                color: success ? '#4CAF50' : '#ff0000',
+                align: 'center'
+              }
+            ]
+          },
+          footer: {
+            type: 'box',
+            layout: 'vertical',
+            spacing: 'sm',
+            contents: [
+              {
+                type: 'button',
+                style: 'secondary',
+                action: {
+                  type: 'message',
+                  label: '↩️ 回到訂閱管理',
+                  text: '訂閱提醒'
+                }
+              }
+            ]
+          }
+        }
+      };
+      return client.replyMessage(event.replyToken, confirmMessage);
     }
 
     // 解析查詢的內容
@@ -1094,99 +2752,217 @@ async function handleEvent(event) {
       if (queryResult.city) {
         const success = addSubscription(userId, queryResult.city);
         const message = success ? 
-          `✅ 已成功訂閱 ${queryResult.cityName} 的空氣品質提醒！\n\n📅 每日 08:00 推送空氣品質報告\n🚨 AQI>100 時發送緊急警報\n\n輸入「我的訂閱」查看所有訂閱\n輸入「取消訂閱${queryResult.cityName}」可取消` :
+          `✅ 已成功訂閱 ${queryResult.cityName} 的空氣品質提醒！` :
           `📋 您已經訂閱了 ${queryResult.cityName} 的空氣品質提醒`;
           
-        return client.replyMessage(event.replyToken, { type: 'text', text: message });
-      } else {
-        const subscribeHelp = {
-          type: 'text',
-          text: '🔔 訂閱空氣品質提醒\n\n使用方式：\n• 「訂閱台北」\n• 「訂閱高雄」\n• 「訂閱新加坡」\n\n訂閱後每日會推送空氣品質報告，並在空氣品質惡化時發送警報。'
+        const confirmMessage = {
+          type: 'flex',
+          altText: message,
+          contents: {
+            type: 'bubble',
+            header: {
+              type: 'box',
+              layout: 'vertical',
+              contents: [
+                {
+                  type: 'text',
+                  text: success ? '🎉 訂閱成功' : '📋 已訂閱',
+                  weight: 'bold',
+                  color: '#ffffff',
+                  size: 'lg',
+                  align: 'center'
+                }
+              ],
+              backgroundColor: success ? '#4CAF50' : '#ff7e00',
+              paddingAll: '20px'
+            },
+            body: {
+              type: 'box',
+              layout: 'vertical',
+              spacing: 'md',
+              contents: [
+                {
+                  type: 'text',
+                  text: message,
+                  color: '#333333',
+                  align: 'center',
+                  wrap: true
+                },
+                ...(success ? [
+                  {
+                    type: 'separator',
+                    margin: 'lg'
+                  },
+                  {
+                    type: 'text',
+                    text: '📅 每日 08:00 推送空氣品質報告\n🚨 AQI>100 時發送緊急警報',
+                    size: 'sm',
+                    color: '#666666',
+                    align: 'center',
+                    wrap: true,
+                    margin: 'lg'
+                  }
+                ] : [])
+              ]
+            },
+            footer: {
+              type: 'box',
+              layout: 'vertical',
+              spacing: 'sm',
+              contents: [
+                {
+                  type: 'separator'
+                },
+                {
+                  type: 'button',
+                  style: 'secondary',
+                  action: {
+                    type: 'message',
+                    label: '📋 管理訂閱',
+                    text: '訂閱提醒'
+                  },
+                  margin: 'sm'
+                }
+              ]
+            }
+          }
         };
-        return client.replyMessage(event.replyToken, [subscribeHelp, createCityQuickReply()]);
+        
+        return client.replyMessage(event.replyToken, confirmMessage);
+      } else {
+        setUserState(userId, 'awaiting_subscribe_city');
+        const citySelectionMessage = createCitySelectionFlexMessage();
+        return client.replyMessage(event.replyToken, citySelectionMessage);
       }
     }
 
     // 處理取消訂閱
     if (queryResult && queryResult.type === 'unsubscribe') {
-      // 檢查是否指定了城市
-      let cityToUnsubscribe = null;
-      let cityNameToUnsubscribe = null;
-      
-      for (const [chinese, english] of Object.entries(cityMap)) {
-        if (userMessage.includes(chinese)) {
-          cityToUnsubscribe = english;
-          cityNameToUnsubscribe = chinese;
-          break;
-        }
-      }
-      
-      if (cityToUnsubscribe) {
-        const success = removeSubscription(userId, cityToUnsubscribe);
+      if (queryResult.city) {
+        const success = removeSubscription(userId, queryResult.city);
         const message = success ?
-          `✅ 已取消訂閱 ${cityNameToUnsubscribe} 的空氣品質提醒` :
-          `❌ 您沒有訂閱 ${cityNameToUnsubscribe} 的提醒`;
-        return client.replyMessage(event.replyToken, { type: 'text', text: message });
+          `✅ 已取消訂閱 ${queryResult.cityName} 的空氣品質提醒` :
+          `❌ 您沒有訂閱 ${queryResult.cityName} 的提醒`;
+        
+        const confirmMessage = {
+          type: 'flex',
+          altText: message,
+          contents: {
+            type: 'bubble',
+            header: {
+              type: 'box',
+              layout: 'vertical',
+              contents: [
+                {
+                  type: 'text',
+                  text: success ? '✅ 取消訂閱成功' : '❌ 取消失敗',
+                  weight: 'bold',
+                  color: '#ffffff',
+                  size: 'lg',
+                  align: 'center'
+                }
+              ],
+              backgroundColor: success ? '#4CAF50' : '#ff0000',
+              paddingAll: '20px'
+            },
+            body: {
+              type: 'box',
+              layout: 'vertical',
+              contents: [
+                {
+                  type: 'text',
+                  text: message,
+                  color: '#333333',
+                  align: 'center',
+                  wrap: true
+                }
+              ]
+            },
+            footer: {
+              type: 'box',
+              layout: 'vertical',
+              spacing: 'sm',
+              contents: [
+                {
+                  type: 'separator'
+                },
+                {
+                  type: 'button',
+                  style: 'secondary',
+                  action: {
+                    type: 'message',
+                    label: '📋 管理訂閱',
+                    text: '訂閱提醒'
+                  },
+                  margin: 'sm'
+                }
+              ]
+            }
+          }
+        };
+        
+        return client.replyMessage(event.replyToken, confirmMessage);
       } else {
-        // 取消所有訂閱
+        // 顯示當前訂閱讓用戶選擇取消
         const userSub = getUserSubscriptions(userId);
-        if (userSub.cities.length > 0) {
-          subscriptions.delete(userId);
-          return client.replyMessage(event.replyToken, { 
-            type: 'text', 
-            text: '✅ 已取消所有空氣品質提醒訂閱' 
-          });
-        } else {
-          return client.replyMessage(event.replyToken, { 
-            type: 'text', 
-            text: '❌ 您目前沒有任何訂閱' 
-          });
+        if (userSub.cities.length === 0) {
+          const noSubMessage = {
+            type: 'flex',
+            altText: '沒有訂閱需要取消',
+            contents: {
+              type: 'bubble',
+              body: {
+                type: 'box',
+                layout: 'vertical',
+                contents: [
+                  {
+                    type: 'text',
+                    text: '❌ 您目前沒有任何訂閱',
+                    color: '#666666',
+                    align: 'center'
+                  }
+                ]
+              },
+              footer: {
+                type: 'box',
+                layout: 'vertical',
+                spacing: 'sm',
+                contents: [
+                  {
+                    type: 'button',
+                    style: 'primary',
+                    color: '#4CAF50',
+                    action: {
+                      type: 'message',
+                      label: '➕ 新增訂閱',
+                      text: '新增訂閱'
+                    }
+                  }
+                ]
+              }
+            }
+          };
+          return client.replyMessage(event.replyToken, noSubMessage);
         }
+        
+        const subscriptionMessage = createSubscriptionManagementFlexMessage(userId);
+        return client.replyMessage(event.replyToken, subscriptionMessage);
       }
     }
 
     // 處理查看訂閱清單
     if (queryResult && queryResult.type === 'list_subscriptions') {
-      const userSub = getUserSubscriptions(userId);
-      if (userSub.cities.length === 0) {
-        const noSubMessage = {
-          type: 'text',
-          text: '📋 您目前沒有訂閱任何城市\n\n💡 使用「訂閱台北」開始訂閱空氣品質提醒\n\n訂閱後可享受：\n• 🌅 每日空氣品質報告\n• 🚨 空氣品質惡化警報\n• 📊 個人化健康建議'
-        };
-        return client.replyMessage(event.replyToken, [noSubMessage, createCityQuickReply()]);
-      }
-      
-      const cityNames = userSub.cities.map(city => {
-        const chinese = Object.keys(cityMap).find(key => cityMap[key] === city);
-        return chinese || city;
-      });
-      
-      const subListMessage = {
-        type: 'text',
-        text: `📋 您的訂閱清單：\n\n${cityNames.map((city, index) => `${index + 1}. ${city}`).join('\n')}\n\n⚙️ 設定：\n• 📅 每日報告：已開啟\n• 🚨 緊急警報：已開啟\n• ⚠️ 警報閾值：AQI > 100\n\n💡 輸入「取消訂閱[城市名]」可取消特定城市`
-      };
-      return client.replyMessage(event.replyToken, subListMessage);
-    }
-
-    if (!queryResult) {
-      const notFoundMessage = {
-        type: 'text',
-        text: '🤔 抱歉，我無法識別您要查詢的內容。\n\n請嘗試：\n• 查詢：「台北空氣品質」\n• 比較：「比較台北高雄」\n• 訂閱：「訂閱台北」\n• 定位：分享您的位置'
-      };
-      
-      return client.replyMessage(event.replyToken, [notFoundMessage, createCityQuickReply()]);
+      const subscriptionMessage = createSubscriptionManagementFlexMessage(userId);
+      return client.replyMessage(event.replyToken, subscriptionMessage);
     }
 
     // 處理多城市比較
-    if (queryResult.type === 'compare') {
+    if (queryResult && queryResult.type === 'compare') {
       const citiesData = await getMultipleCitiesAirQuality(queryResult.cities);
       
       if (citiesData.length === 0) {
-        const errorMessage = {
-          type: 'text',
-          text: '😵 抱歉，無法獲取這些城市的空氣品質數據。\n請稍後再試，或嘗試其他城市。'
-        };
-        return client.replyMessage(event.replyToken, [errorMessage, createCityQuickReply()]);
+        const errorMessage = createErrorFlexMessage('api_error', '抱歉，無法獲取這些城市的空氣品質數據。請稍後再試，或嘗試其他城市。');
+        return client.replyMessage(event.replyToken, errorMessage);
       }
       
       if (citiesData.length === 1) {
@@ -1201,22 +2977,264 @@ async function handleEvent(event) {
     }
 
     // 處理單城市查詢
-    if (queryResult.type === 'single') {
+    if (queryResult && queryResult.type === 'single') {
       const airQualityData = await getAirQuality(queryResult.city);
       const flexMessage = createAirQualityFlexMessage(airQualityData);
       
       return client.replyMessage(event.replyToken, flexMessage);
     }
+
+    // 處理自訂比較指令
+    if (userMessage === '自訂城市比較') {
+      setUserState(userId, 'awaiting_compare_cities');
+      const instructionMessage = {
+        type: 'flex',
+        altText: '自訂多城市比較',
+        contents: {
+          type: 'bubble',
+          header: {
+            type: 'box',
+            layout: 'vertical',
+            contents: [
+              {
+                type: 'text',
+                text: '🆚 自訂城市比較',
+                weight: 'bold',
+                color: '#ffffff',
+                size: 'lg',
+                align: 'center'
+              }
+            ],
+            backgroundColor: '#8f3f97',
+            paddingAll: '20px'
+          },
+          body: {
+            type: 'box',
+            layout: 'vertical',
+            spacing: 'md',
+            contents: [
+              {
+                type: 'text',
+                text: '請輸入要比較的城市名稱',
+                color: '#333333',
+                align: 'center',
+                weight: 'bold'
+              },
+              {
+                type: 'text',
+                text: '用空格分隔，最多可比較5個城市',
+                size: 'sm',
+                color: '#666666',
+                align: 'center',
+                margin: 'sm'
+              },
+              {
+                type: 'text',
+                text: '📝 範例：',
+                color: '#666666',
+                margin: 'lg'
+              },
+              {
+                type: 'text',
+                text: '台北 高雄 台中\n東京 首爾 新加坡 香港',
+                size: 'sm',
+                color: '#666666',
+                wrap: true
+              }
+            ]
+          },
+          footer: {
+            type: 'box',
+            layout: 'vertical',
+            spacing: 'sm',
+            contents: [
+              {
+                type: 'separator'
+              },
+              {
+                type: 'button',
+                style: 'secondary',
+                action: {
+                  type: 'message',
+                  label: '❌ 取消',
+                  text: '主選單'
+                },
+                margin: 'sm'
+              }
+            ]
+          }
+        }
+      };
+      return client.replyMessage(event.replyToken, instructionMessage);
+    }
+    
+    // 如果沒有匹配到任何指令，顯示錯誤訊息和主選單
+    const notFoundMessage = createErrorFlexMessage('not_found', '我無法識別您的指令。請使用下方選單或嘗試直接輸入城市名稱。');
+    const menuMessage = createMainMenuFlexMessage();
+    
+    return client.replyMessage(event.replyToken, [notFoundMessage, menuMessage]);
     
   } catch (error) {
     console.error('處理訊息錯誤:', error);
     
-    const errorMessage = {
-      type: 'text',
-      text: '😵 抱歉，查詢空氣品質時發生錯誤。\n請稍後再試，或嘗試查詢其他城市。'
-    };
+    const errorMessage = createErrorFlexMessage('api_error', '查詢空氣品質時發生錯誤，請稍後再試。');
+    const menuMessage = createMainMenuFlexMessage();
     
-    return client.replyMessage(event.replyToken, [errorMessage, createCityQuickReply()]);
+    return client.replyMessage(event.replyToken, [errorMessage, menuMessage]);
+  }
+}
+
+// 處理有狀態的對話
+async function handleStatefulMessage(event, userState) {
+  const userId = event.source.userId;
+  const userMessage = event.message.text;
+  
+  try {
+    if (userState.state === 'awaiting_compare_cities') {
+      // 處理城市比較輸入
+      const cities = [];
+      const words = userMessage.split(/[\s,，]+/);
+      
+      for (const word of words) {
+        const trimmed = word.trim();
+        if (trimmed) {
+          for (const [chinese, english] of Object.entries(cityMap)) {
+            if (trimmed.includes(chinese) || trimmed.toLowerCase().includes(english)) {
+              cities.push({ chinese, english });
+              break;
+            }
+          }
+        }
+      }
+      
+      clearUserState(userId);
+      
+      if (cities.length < 2) {
+        const errorMessage = createErrorFlexMessage('not_found', '請至少輸入2個城市名稱，用空格分隔。');
+        return client.replyMessage(event.replyToken, errorMessage);
+      }
+      
+      if (cities.length > 5) {
+        cities.splice(5); // 限制最多5個城市
+      }
+      
+      const citiesData = await getMultipleCitiesAirQuality(cities);
+      
+      if (citiesData.length === 0) {
+        const errorMessage = createErrorFlexMessage('api_error', '無法獲取這些城市的空氣品質數據，請檢查城市名稱是否正確。');
+        return client.replyMessage(event.replyToken, errorMessage);
+      }
+      
+      const comparisonMessage = createCityComparisonFlexMessage(citiesData);
+      return client.replyMessage(event.replyToken, comparisonMessage);
+    }
+    
+    if (userState.state === 'awaiting_subscribe_city') {
+      // 處理訂閱城市輸入
+      const queryResult = parseQuery(userMessage);
+      
+      clearUserState(userId);
+      
+      if (queryResult && queryResult.type === 'single') {
+        const success = addSubscription(userId, queryResult.city);
+        const message = success ? 
+          `✅ 已成功訂閱 ${queryResult.cityName} 的空氣品質提醒！` :
+          `📋 您已經訂閱了 ${queryResult.cityName} 的空氣品質提醒`;
+          
+        const confirmMessage = {
+          type: 'flex',
+          altText: message,
+          contents: {
+            type: 'bubble',
+            header: {
+              type: 'box',
+              layout: 'vertical',
+              contents: [
+                {
+                  type: 'text',
+                  text: success ? '🎉 訂閱成功' : '📋 已訂閱',
+                  weight: 'bold',
+                  color: '#ffffff',
+                  size: 'lg',
+                  align: 'center'
+                }
+              ],
+              backgroundColor: success ? '#4CAF50' : '#ff7e00',
+              paddingAll: '20px'
+            },
+            body: {
+              type: 'box',
+              layout: 'vertical',
+              spacing: 'md',
+              contents: [
+                {
+                  type: 'text',
+                  text: message,
+                  color: '#333333',
+                  align: 'center',
+                  wrap: true
+                },
+                ...(success ? [
+                  {
+                    type: 'separator',
+                    margin: 'lg'
+                  },
+                  {
+                    type: 'text',
+                    text: '📅 每日 08:00 推送空氣品質報告\n🚨 AQI>100 時發送緊急警報',
+                    size: 'sm',
+                    color: '#666666',
+                    align: 'center',
+                    wrap: true,
+                    margin: 'lg'
+                  }
+                ] : [])
+              ]
+            },
+            footer: {
+              type: 'box',
+              layout: 'vertical',
+              spacing: 'sm',
+              contents: [
+                {
+                  type: 'separator'
+                },
+                {
+                  type: 'button',
+                  style: 'secondary',
+                  action: {
+                    type: 'message',
+                    label: '📋 管理訂閱',
+                    text: '訂閱提醒'
+                  },
+                  margin: 'sm'
+                }
+              ]
+            }
+          }
+        };
+        
+        return client.replyMessage(event.replyToken, confirmMessage);
+      } else {
+        const errorMessage = createErrorFlexMessage('not_found', '無法識別城市名稱，請重新輸入或使用選單選擇。');
+        const citySelectionMessage = createCitySelectionFlexMessage();
+        return client.replyMessage(event.replyToken, [errorMessage, citySelectionMessage]);
+      }
+    }
+    
+    // 如果狀態不匹配，清除狀態並顯示主選單
+    clearUserState(userId);
+    const menuMessage = createMainMenuFlexMessage();
+    return client.replyMessage(event.replyToken, menuMessage);
+    
+  } catch (error) {
+    console.error('處理狀態對話錯誤:', error);
+    clearUserState(userId);
+    
+    const errorMessage = createErrorFlexMessage('api_error', '處理請求時發生錯誤，請重試。');
+    const menuMessage = createMainMenuFlexMessage();
+    
+    return client.replyMessage(event.replyToken, [errorMessage, menuMessage]);
   }
 }
 
@@ -1235,11 +3253,11 @@ app.post('/webhook', line.middleware(config), (req, res) => {
 app.get('/', (req, res) => {
   try {
     // 檢查文件是否存在
-    const filePath = path.join(__dirname, 'public', 'index.html');
+    const filePath = path.join(__dirname, 'index.html');
     if (fs.existsSync(filePath)) {
       res.sendFile(filePath);
     } else {
-      // 如果 public/index.html 不存在，直接返回 HTML 內容
+      // 如果 index.html 不存在，直接返回 HTML 內容
       res.send(`
 <!DOCTYPE html>
 <html lang="zh-TW">
@@ -1303,7 +3321,6 @@ app.get('/', (req, res) => {
             background: #f8fafc; 
             border-radius: 10px; 
             transition: all 0.3s ease;
-            cursor: pointer;
         }
         .feature:hover {
             transform: translateY(-5px);
@@ -1328,206 +3345,10 @@ app.get('/', (req, res) => {
             50% { opacity: 0.5; }
             100% { opacity: 1; }
         }
-        
-        /* 聊天展示區域 */
-        .chat-demos {
-            background: white;
-            padding: 3rem;
-            border-radius: 20px;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.1);
-            margin-bottom: 3rem;
-        }
-        
-        .demo-tabs {
-            display: flex;
-            justify-content: center;
-            flex-wrap: wrap;
-            gap: 0.5rem;
-            margin-bottom: 2rem;
-            border-bottom: 2px solid #f0f0f0;
-        }
-        
-        .demo-tab {
-            padding: 0.8rem 1.5rem;
-            background: #f8fafc;
-            border: none;
-            border-radius: 20px 20px 0 0;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            font-weight: 500;
-            color: #666;
-            font-size: 0.9rem;
-        }
-        
-        .demo-tab.active {
-            background: #00b900;
-            color: white;
-            transform: translateY(2px);
-        }
-        
-        .chat-container {
-            max-width: 400px;
-            margin: 0 auto;
-            background: #f8fafc;
-            border-radius: 20px;
-            padding: 1rem;
-            min-height: 500px;
-            position: relative;
-            border: 3px solid #ddd;
-        }
-        
-        .chat-header {
-            display: flex;
-            align-items: center;
-            padding: 1rem;
-            background: #00b900;
-            color: white;
-            border-radius: 15px 15px 0 0;
-            margin: -1rem -1rem 1rem -1rem;
-        }
-        
-        .chat-header img {
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            margin-right: 1rem;
-            background: white;
-            padding: 5px;
-        }
-        
-        .chat-messages {
-            height: 400px;
-            overflow-y: auto;
-            padding: 0.5rem;
-        }
-        
-        .message {
-            margin: 1rem 0;
-            display: flex;
-            align-items: flex-end;
-            opacity: 0;
-            animation: messageAppear 0.5s ease forwards;
-        }
-        
-        .message.user {
-            justify-content: flex-end;
-        }
-        
-        .message.bot {
-            justify-content: flex-start;
-        }
-        
-        .message-bubble {
-            max-width: 80%;
-            padding: 0.8rem 1.2rem;
-            border-radius: 18px;
-            font-size: 0.9rem;
-            line-height: 1.4;
-            position: relative;
-        }
-        
-        .message.user .message-bubble {
-            background: #00b900;
-            color: white;
-            border-bottom-right-radius: 5px;
-        }
-        
-        .message.bot .message-bubble {
-            background: white;
-            color: #333;
-            border: 1px solid #e1e8ed;
-            border-bottom-left-radius: 5px;
-        }
-        
-        .message-time {
-            font-size: 0.7rem;
-            color: #999;
-            margin: 0 0.5rem;
-        }
-        
-        .typing-indicator {
-            display: none;
-            padding: 1rem;
-            margin: 1rem 0;
-        }
-        
-        .typing-dots {
-            display: inline-flex;
-            align-items: center;
-            padding: 0.8rem 1.2rem;
-            background: white;
-            border: 1px solid #e1e8ed;
-            border-radius: 18px;
-            border-bottom-left-radius: 5px;
-        }
-        
-        .typing-dots span {
-            width: 6px;
-            height: 6px;
-            background: #999;
-            border-radius: 50%;
-            margin: 0 2px;
-            animation: typing 1.5s infinite;
-        }
-        
-        .typing-dots span:nth-child(2) { animation-delay: 0.2s; }
-        .typing-dots span:nth-child(3) { animation-delay: 0.4s; }
-        
-        @keyframes typing {
-            0%, 60%, 100% { opacity: 0.3; }
-            30% { opacity: 1; }
-        }
-        
-        @keyframes messageAppear {
-            from {
-                opacity: 0;
-                transform: translateY(20px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-        
-        .demo-description {
-            text-align: center;
-            margin-bottom: 2rem;
-            color: #666;
-            font-size: 1.1rem;
-        }
-        
-        .flex-message-preview {
-            background: #f0f8ff;
-            border: 2px dashed #00b900;
-            border-radius: 15px;
-            padding: 1rem;
-            margin: 0.5rem 0;
-            font-size: 0.8rem;
-            color: #666;
-            text-align: center;
-        }
-        
-        @media (max-width: 768px) {
-            .hero-section, .chat-demos {
-                padding: 2rem 1.5rem;
-            }
-            h1 { font-size: 2rem; }
-            .demo-tabs {
-                gap: 0.2rem;
-            }
-            .demo-tab {
-                padding: 0.6rem 1rem;
-                font-size: 0.8rem;
-            }
-            .chat-container {
-                max-width: 100%;
-            }
-        }
     </style>
 </head>
 <body>
     <div class="main-container">
-        <!-- Hero Section -->
         <div class="hero-section">
             <h1>🌬️ 智慧空氣品質機器人</h1>
             <p><span class="status-indicator"></span>服務正常運行中</p>
@@ -1543,32 +3364,32 @@ app.get('/', (req, res) => {
             </div>
             
             <div class="features">
-                <div class="feature" onclick="showDemo('query')">
+                <div class="feature">
                     <i class="fas fa-search-location"></i>
                     <h4>即時查詢</h4>
                     <p>30+ 支援城市</p>
                 </div>
-                <div class="feature" onclick="showDemo('compare')">
+                <div class="feature">
                     <i class="fas fa-chart-line"></i>
                     <h4>多城市比較</h4>
                     <p>智慧排序推薦</p>
                 </div>
-                <div class="feature" onclick="showDemo('health')">
+                <div class="feature">
                     <i class="fas fa-user-md"></i>
                     <h4>健康建議</h4>
                     <p>專業防護指導</p>
                 </div>
-                <div class="feature" onclick="showDemo('subscribe')">
+                <div class="feature">
                     <i class="fas fa-bell"></i>
                     <h4>訂閱提醒</h4>
                     <p>每日報告+警報</p>
                 </div>
-                <div class="feature" onclick="showDemo('location')">
+                <div class="feature">
                     <i class="fas fa-map-marker-alt"></i>
                     <h4>GPS定位</h4>
                     <p>附近監測站查詢</p>
                 </div>
-                <div class="feature" onclick="showDemo('ai')">
+                <div class="feature">
                     <i class="fas fa-robot"></i>
                     <h4>AI智慧</h4>
                     <p>自然語言理解</p>
@@ -1576,42 +3397,6 @@ app.get('/', (req, res) => {
             </div>
         </div>
         
-        <!-- Chat Demos Section -->
-        <div class="chat-demos">
-            <h2 style="text-align: center; margin-bottom: 2rem; color: #333;">💬 功能展示</h2>
-            <p class="demo-description">點擊上方功能卡片或下方標籤，查看真實對話範例</p>
-            
-            <div class="demo-tabs">
-                <button class="demo-tab active" onclick="showDemo('query')">🔍 即時查詢</button>
-                <button class="demo-tab" onclick="showDemo('compare')">📊 城市比較</button>
-                <button class="demo-tab" onclick="showDemo('health')">💊 健康建議</button>
-                <button class="demo-tab" onclick="showDemo('subscribe')">🔔 訂閱功能</button>
-                <button class="demo-tab" onclick="showDemo('location')">📍 GPS定位</button>
-                <button class="demo-tab" onclick="showDemo('ai')">🤖 AI智慧</button>
-            </div>
-            
-            <div class="chat-container">
-                <div class="chat-header">
-                    <img src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIHZpZXdCb3g9IjAgMCA0MCA0MCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPGNpcmNsZSBjeD0iMjAiIGN5PSIyMCIgcj0iMjAiIGZpbGw9IiMwMGI5MDAiLz4KPHRleHQgeD0iMjAiIHk9IjI2IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSJ3aGl0ZSIgZm9udC1zaXplPSIyMCI+8J+MrjwvdGV4dD4KPC9zdmc+" alt="Bot Avatar">
-                    <div>
-                        <div style="font-weight: bold;">智慧空氣品質機器人</div>
-                        <div style="font-size: 0.8rem; opacity: 0.9;">線上</div>
-                    </div>
-                </div>
-                <div class="chat-messages" id="chatMessages">
-                    <!-- Messages will be inserted here -->
-                </div>
-                <div class="typing-indicator" id="typingIndicator">
-                    <div class="typing-dots">
-                        <span></span>
-                        <span></span>
-                        <span></span>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <!-- Quick Links -->
         <div class="hero-section">
             <h3 style="color: #333; margin-bottom: 1rem;">🚀 快速測試</h3>
             <div style="display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap; font-size: 0.9rem;">
@@ -1625,212 +3410,6 @@ app.get('/', (req, res) => {
             </div>
         </div>
     </div>
-
-<script>
-const demos = {
-    query: {
-        title: '🔍 即時空氣品質查詢',
-        description: '輸入城市名稱，立即獲得詳細的空氣品質報告',
-        messages: [
-            { type: 'user', text: '台北空氣品質', time: '14:30' },
-            { type: 'bot', text: '正在查詢台北的空氣品質數據...', time: '14:30', delay: 1000 },
-            { type: 'bot', content: 'flex', title: '台北空氣品質報告', 
-              preview: '🌬️ AQI: 65 (普通)\\n📍 台北市\\n😷 建議配戴一般口罩\\n🏃‍♂️ 適合散步、瑜伽', 
-              time: '14:31', delay: 2500 }
-        ]
-    },
-    compare: {
-        title: '📊 多城市空氣品質比較',
-        description: '一次比較多個城市，智慧排序推薦最佳選擇',
-        messages: [
-            { type: 'user', text: '比較台北高雄台中', time: '15:20' },
-            { type: 'bot', text: '正在比較三個城市的空氣品質...', time: '15:20', delay: 1000 },
-            { type: 'bot', content: 'flex', title: '🏆 多城市比較結果', 
-              preview: '🥇 台中 AQI: 45 (良好)\\n🥈 台北 AQI: 65 (普通)\\n🥉 高雄 AQI: 85 (普通)\\n\\n✈️ 推薦前往台中！', 
-              time: '15:21', delay: 3000 }
-        ]
-    },
-    health: {
-        title: '💊 專業健康建議',
-        description: '根據空氣品質提供個人化健康防護指導',
-        messages: [
-            { type: 'user', text: '高雄空氣品質', time: '16:45' },
-            { type: 'bot', content: 'flex', title: '高雄空氣品質報告', 
-              preview: '😰 AQI: 120 (不健康)\\n🚨 建議減少戶外活動\\n😷 必須配戴N95口罩\\n🏠 關閉門窗使用空氣清淨機', 
-              time: '16:46', delay: 2000 },
-            { type: 'user', text: '可以運動嗎？', time: '16:47' },
-            { type: 'bot', text: '目前高雄AQI為120，建議：\\n\\n🏠 僅建議室內輕度活動\\n🚫 避免戶外運動\\n💪 可在室內做瑜伽、伸展\\n⚠️ 敏感族群請特別注意', time: '16:47', delay: 1500 }
-        ]
-    },
-    subscribe: {
-        title: '🔔 訂閱提醒服務',
-        description: '每日推送空氣品質報告，惡化時立即警報',
-        messages: [
-            { type: 'user', text: '訂閱台北', time: '09:15' },
-            { type: 'bot', text: '✅ 已成功訂閱台北的空氣品質提醒！\\n\\n📅 每日 08:00 推送報告\\n🚨 AQI>100 時緊急警報\\n\\n輸入「我的訂閱」查看清單', time: '09:15', delay: 1000 },
-            { type: 'user', text: '我的訂閱', time: '09:16' },
-            { type: 'bot', text: '📋 您的訂閱清單：\\n\\n1. 台北\\n\\n⚙️ 設定：\\n• 📅 每日報告：已開啟\\n• 🚨 緊急警報：已開啟\\n• ⚠️ 警報閾值：AQI > 100', time: '09:16', delay: 1200 }
-        ]
-    },
-    location: {
-        title: '📍 GPS定位查詢',
-        description: '分享位置即可查詢附近監測站的空氣品質',
-        messages: [
-            { type: 'user', text: '[分享了位置]', time: '12:30', location: true },
-            { type: 'bot', text: '正在查找您附近的空氣品質監測站...', time: '12:30', delay: 1500 },
-            { type: 'bot', content: 'flex', title: '📍 附近監測站', 
-              preview: '1. 台北車站 (0.8km)\\n   AQI: 62 (普通)\\n\\n2. 中山站 (1.2km)\\n   AQI: 58 (普通)\\n\\n3. 西門站 (1.5km)\\n   AQI: 65 (普通)', 
-              time: '12:31', delay: 3000 }
-        ]
-    },
-    ai: {
-        title: '🤖 AI智慧對話',
-        description: '自然語言理解，支援多種靈活的查詢方式',
-        messages: [
-            { type: 'user', text: '今天適合出門嗎？我在台北', time: '08:30' },
-            { type: 'bot', text: '讓我查一下台北今天的空氣品質...', time: '08:30', delay: 1000 },
-            { type: 'bot', text: '台北今天AQI為65（普通等級）\\n\\n😊 適合出門！建議：\\n• 🚶‍♂️ 適合散步、輕度運動\\n• 😷 建議配戴一般口罩\\n• ⚠️ 敏感族群注意防護', time: '08:31', delay: 2500 },
-            { type: 'user', text: '謝謝！', time: '08:32' },
-            { type: 'bot', text: '不客氣！😊 隨時為您監測空氣品質。\\n如需其他城市資訊或想訂閱提醒，都可以告訴我喔～', time: '08:32', delay: 800 }
-        ]
-    }
-};
-
-let currentDemo = 'query';
-let messageIndex = 0;
-let isPlaying = false;
-
-function showDemo(demoKey) {
-    if (isPlaying) return;
-    
-    currentDemo = demoKey;
-    messageIndex = 0;
-    
-    // Update tab styles
-    document.querySelectorAll('.demo-tab').forEach(tab => {
-        tab.classList.remove('active');
-    });
-    event?.target?.classList.add('active') || 
-    document.querySelector(\`[onclick="showDemo('\${demoKey}')"]\`).classList.add('active');
-    
-    // Clear messages
-    const messagesContainer = document.getElementById('chatMessages');
-    messagesContainer.innerHTML = '';
-    
-    // Start playing messages
-    playDemo();
-}
-
-function playDemo() {
-    if (isPlaying) return;
-    isPlaying = true;
-    
-    const demo = demos[currentDemo];
-    const messagesContainer = document.getElementById('chatMessages');
-    const typingIndicator = document.getElementById('typingIndicator');
-    
-    function showNextMessage() {
-        if (messageIndex >= demo.messages.length) {
-            isPlaying = false;
-            return;
-        }
-        
-        const message = demo.messages[messageIndex];
-        const delay = message.delay || 0;
-        
-        // Show typing indicator for bot messages
-        if (message.type === 'bot' && delay > 500) {
-            typingIndicator.style.display = 'block';
-            setTimeout(() => {
-                typingIndicator.style.display = 'none';
-                addMessage(message);
-                messageIndex++;
-                setTimeout(showNextMessage, 500);
-            }, delay);
-        } else {
-            setTimeout(() => {
-                addMessage(message);
-                messageIndex++;
-                setTimeout(showNextMessage, 500);
-            }, delay);
-        }
-    }
-    
-    showNextMessage();
-}
-
-function addMessage(message) {
-    const messagesContainer = document.getElementById('chatMessages');
-    const messageDiv = document.createElement('div');
-    messageDiv.className = \`message \${message.type}\`;
-    
-    let messageContent = '';
-    
-    if (message.content === 'flex') {
-        messageContent = \`
-            <div class="message-bubble">
-                <div class="flex-message-preview">
-                    <strong>\${message.title}</strong><br>
-                    <div style="margin-top: 0.5rem; font-size: 0.75rem;">
-                        \${message.preview.replace(/\\\\n/g, '<br>')}
-                    </div>
-                </div>
-            </div>
-            <div class="message-time">\${message.time}</div>
-        \`;
-    } else if (message.location) {
-        messageContent = \`
-            <div class="message-bubble">
-                📍 位置資訊
-                <div style="margin-top: 0.5rem; padding: 0.5rem; background: rgba(0,0,0,0.1); border-radius: 8px; font-size: 0.8rem;">
-                    🗺️ 台北市中正區<br>
-                    📌 25.0478°N, 121.5319°E
-                </div>
-            </div>
-            <div class="message-time">\${message.time}</div>
-        \`;
-    } else {
-        messageContent = \`
-            <div class="message-bubble">\${message.text.replace(/\\\\n/g, '<br>')}</div>
-            <div class="message-time">\${message.time}</div>
-        \`;
-    }
-    
-    messageDiv.innerHTML = messageContent;
-    messagesContainer.appendChild(messageDiv);
-    messagesContainer.scrollTop = messagesContainer.scrollHeight;
-}
-
-// Initialize with first demo
-document.addEventListener('DOMContentLoaded', function() {
-    setTimeout(() => showDemo('query'), 1000);
-});
-
-// Auto-cycle demos every 15 seconds when not manually controlled
-let autoCycleTimer;
-function startAutoCycle() {
-    const demoKeys = Object.keys(demos);
-    let currentIndex = 0;
-    
-    autoCycleTimer = setInterval(() => {
-        if (!isPlaying) {
-            currentIndex = (currentIndex + 1) % demoKeys.length;
-            showDemo(demoKeys[currentIndex]);
-        }
-    }, 15000);
-}
-
-// Start auto-cycle after initial load
-setTimeout(startAutoCycle, 10000);
-
-// Pause auto-cycle when user interacts
-document.querySelectorAll('.demo-tab, .feature').forEach(element => {
-    element.addEventListener('click', () => {
-        clearInterval(autoCycleTimer);
-        setTimeout(startAutoCycle, 30000); // Restart after 30 seconds
-    });
-});
-</script>
 </body>
 </html>
       `);
@@ -1847,8 +3426,7 @@ document.querySelectorAll('.demo-tab, .feature').forEach(element => {
 
 // 健康檢查端點 - 增強診斷功能
 app.get('/health', (req, res) => {
-  const publicExists = fs.existsSync(path.join(__dirname, 'public'));
-  const indexExists = fs.existsSync(path.join(__dirname, 'public', 'index.html'));
+  const indexExists = fs.existsSync(path.join(__dirname, 'index.html'));
   
   res.json({ 
     status: 'OK', 
@@ -1859,7 +3437,6 @@ app.get('/health', (req, res) => {
       node_version: process.version,
       platform: process.platform,
       memory_usage: process.memoryUsage(),
-      public_folder_exists: publicExists,
       index_html_exists: indexExists,
       line_token_configured: !!process.env.LINE_CHANNEL_ACCESS_TOKEN,
       line_secret_configured: !!process.env.LINE_CHANNEL_SECRET,
@@ -1870,8 +3447,16 @@ app.get('/health', (req, res) => {
       '多城市比較',
       '智慧健康建議',
       '訂閱提醒系統',
-      'GPS定位查詢'
-    ]
+      'GPS定位查詢',
+      '圖文選單介面',
+      '用戶狀態管理'
+    ],
+    statistics: {
+      total_subscriptions: subscriptions.size,
+      location_cache_entries: locationCache.size,
+      active_user_states: userStates.size,
+      supported_cities: Object.keys(cityMap).length
+    }
   });
 });
 
@@ -1893,6 +3478,63 @@ app.get('/api/air-quality/:city', async (req, res) => {
   }
 });
 
+// 統計端點 - 獲取服務統計
+app.get('/api/stats', (req, res) => {
+  res.json({
+    service: {
+      name: '智慧空氣品質機器人',
+      version: '2.0.0',
+      status: 'running'
+    },
+    statistics: {
+      supportedCities: Object.keys(cityMap).length,
+      totalSubscriptions: subscriptions.size,
+      activeCacheEntries: locationCache.size,
+      activeUserStates: userStates.size
+    },
+    features: [
+      'real_time_air_quality',
+      'multi_city_comparison', 
+      'health_recommendations',
+      'subscription_alerts',
+      'gps_location_query',
+      'flex_message_interface',
+      'user_state_management'
+    ],
+    cities: Object.keys(cityMap),
+    uptime: Math.floor(process.uptime()),
+    last_updated: new Date().toISOString()
+  });
+});
+
+// 訂閱統計端點
+app.get('/api/subscriptions/stats', (req, res) => {
+  const stats = {
+    total_users: subscriptions.size,
+    total_subscriptions: Array.from(subscriptions.values()).reduce((sum, user) => sum + user.cities.length, 0),
+    settings_distribution: {
+      daily_report_enabled: 0,
+      emergency_alert_enabled: 0,
+      threshold_50: 0,
+      threshold_100: 0,
+      threshold_150: 0
+    }
+  };
+
+  for (const userSub of subscriptions.values()) {
+    if (userSub.settings.dailyReport) stats.settings_distribution.daily_report_enabled++;
+    if (userSub.settings.emergencyAlert) stats.settings_distribution.emergency_alert_enabled++;
+    
+    switch (userSub.settings.threshold) {
+      case 50: stats.settings_distribution.threshold_50++; break;
+      case 100: stats.settings_distribution.threshold_100++; break;
+      case 150: stats.settings_distribution.threshold_150++; break;
+    }
+  }
+
+  res.json(stats);
+});
+
 // 調試端點 - 檢查服務狀態
 app.get('/debug', (req, res) => {
   try {
@@ -1911,8 +3553,7 @@ app.get('/debug', (req, res) => {
       },
       file_system: {
         current_directory: __dirname,
-        public_exists: fs.existsSync(path.join(__dirname, 'public')),
-        index_exists: fs.existsSync(path.join(__dirname, 'public', 'index.html')),
+        index_exists: fs.existsSync(path.join(__dirname, 'index.html')),
         package_exists: fs.existsSync(path.join(__dirname, 'package.json'))
       },
       routes: [
@@ -1920,10 +3561,26 @@ app.get('/debug', (req, res) => {
         'GET /health', 
         'GET /debug',
         'GET /api/air-quality/:city',
+        'GET /api/stats',
+        'GET /api/subscriptions/stats',
         'POST /webhook'
       ],
-      subscriptions_count: subscriptions.size,
-      location_cache_count: locationCache.size
+      data_statistics: {
+        subscriptions_count: subscriptions.size,
+        location_cache_count: locationCache.size,
+        user_states_count: userStates.size,
+        supported_cities_count: Object.keys(cityMap).length
+      },
+      features_status: {
+        real_time_query: 'enabled',
+        multi_city_comparison: 'enabled',
+        subscription_management: 'enabled',
+        gps_location_query: 'enabled',
+        health_recommendations: 'enabled',
+        flex_message_interface: 'enabled',
+        daily_reports: 'enabled',
+        emergency_alerts: 'enabled'
+      }
     });
   } catch (error) {
     res.status(500).json({
@@ -1931,6 +3588,29 @@ app.get('/debug', (req, res) => {
       message: error.message
     });
   }
+});
+
+// 清理過期的用戶狀態和位置快取（每小時執行一次）
+cron.schedule('0 * * * *', () => {
+  const now = Date.now();
+  
+  // 清理過期的用戶狀態（超過5分鐘）
+  for (const [userId, state] of userStates.entries()) {
+    if (now - state.timestamp > 300000) {
+      userStates.delete(userId);
+    }
+  }
+  
+  // 清理過期的位置快取（超過1小時）
+  for (const [userId, location] of locationCache.entries()) {
+    if (now - location.timestamp > 3600000) {
+      locationCache.delete(userId);
+    }
+  }
+  
+  console.log(`清理完成 - 用戶狀態: ${userStates.size}, 位置快取: ${locationCache.size}`);
+}, {
+  timezone: "Asia/Taipei"
 });
 
 // 錯誤處理中間件
@@ -1950,22 +3630,40 @@ app.use((req, res) => {
     path: req.path,
     method: req.method,
     message: '請求的路由不存在',
-    available_routes: ['/', '/health', '/debug', '/api/air-quality/:city'],
+    available_routes: ['/', '/health', '/debug', '/api/air-quality/:city', '/api/stats', '/api/subscriptions/stats'],
     timestamp: new Date().toISOString()
   });
+});
+
+// 優雅關機處理
+process.on('SIGTERM', () => {
+  console.log('收到 SIGTERM 信號，正在優雅關機...');
+  // 可以在這裡保存數據到數據庫
+  process.exit(0);
+});
+
+process.on('SIGINT', () => {
+  console.log('收到 SIGINT 信號，正在優雅關機...');
+  // 可以在這裡保存數據到數據庫
+  process.exit(0);
 });
 
 // 啟動服務器
 const port = process.env.PORT || 3000;
 app.listen(port, '0.0.0.0', () => {
-  console.log(`LINE智慧空氣品質機器人在端口 ${port} 上運行`);
-  console.log('功能列表：');
+  console.log(`🚀 LINE智慧空氣品質機器人在端口 ${port} 上運行`);
+  console.log('✨ 全新功能列表：');
   console.log('✅ 即時空氣品質查詢');
   console.log('✅ 多城市比較功能');
   console.log('✅ 智慧健康建議系統');
-  console.log('✅ 訂閱提醒系統');
+  console.log('✅ 完整訂閱管理系統');
   console.log('✅ GPS定位查詢');
-  console.log('✅ 精美介紹網頁');
+  console.log('✅ 圖文選單介面');
+  console.log('✅ 用戶狀態管理');
+  console.log('✅ 個人化設定');
+  console.log('✅ 每日報告推送');
+  console.log('✅ 緊急警報系統');
+  console.log('✅ 優雅錯誤處理');
   console.log(`🌐 服務網址: http://0.0.0.0:${port}`);
   
   // 檢查環境變數
@@ -1978,9 +3676,12 @@ app.listen(port, '0.0.0.0', () => {
     console.log('✅ LINE Bot 環境變數設定完成');
   }
   
-  // 檢查文件系統
-  console.log('📁 文件系統檢查：');
-  console.log(`- 工作目錄: ${__dirname}`);
-  console.log(`- public 資料夾存在: ${fs.existsSync(path.join(__dirname, 'public'))}`);
-  console.log(`- index.html 存在: ${fs.existsSync(path.join(__dirname, 'public', 'index.html'))}`);
+  // 統計信息
+  console.log('📊 初始統計：');
+  console.log(`- 支援城市數量: ${Object.keys(cityMap).length}`);
+  console.log(`- 訂閱用戶數量: ${subscriptions.size}`);
+  console.log(`- 活躍用戶狀態: ${userStates.size}`);
+  console.log(`- 位置快取項目: ${locationCache.size}`);
+  
+  console.log('🎉 系統已完全啟動，準備接收 LINE 訊息！');
 });
