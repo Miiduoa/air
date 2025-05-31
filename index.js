@@ -3,6 +3,7 @@ const line = require('@line/bot-sdk');
 const axios = require('axios');
 const cron = require('node-cron');
 const path = require('path');
+const fs = require('fs');
 
 const app = express();
 
@@ -1230,18 +1231,198 @@ app.post('/webhook', line.middleware(config), (req, res) => {
     });
 });
 
-// 介紹網頁端點
+// 修復後的首頁端點 - 解決文件路徑問題
 app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+  try {
+    // 檢查文件是否存在
+    const filePath = path.join(__dirname, 'public', 'index.html');
+    if (fs.existsSync(filePath)) {
+      res.sendFile(filePath);
+    } else {
+      // 如果 public/index.html 不存在，直接返回 HTML 內容
+      res.send(`
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>智慧空氣品質機器人 | LINE Bot</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: 'Segoe UI', sans-serif; 
+            background: linear-gradient(-45deg, #667eea, #764ba2, #6b73ff, #9644ff); 
+            background-size: 400% 400%;
+            animation: gradient-shift 8s ease infinite;
+            min-height: 100vh; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+        }
+        @keyframes gradient-shift {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+        .container { 
+            background: white; 
+            padding: 3rem; 
+            border-radius: 20px; 
+            box-shadow: 0 20px 60px rgba(0,0,0,0.1); 
+            text-align: center; 
+            max-width: 600px; 
+            margin: 2rem;
+        }
+        h1 { color: #333; margin-bottom: 1rem; font-size: 2.5rem; }
+        p { color: #666; margin-bottom: 2rem; font-size: 1.2rem; line-height: 1.6; }
+        .cta-button { 
+            display: inline-block; 
+            background: #00b900; 
+            color: white; 
+            padding: 15px 40px; 
+            border-radius: 50px; 
+            text-decoration: none; 
+            font-weight: 600; 
+            transition: all 0.3s ease; 
+            margin: 0.5rem;
+        }
+        .cta-button:hover { 
+            transform: translateY(-3px); 
+            box-shadow: 0 10px 30px rgba(0,185,0,0.3); 
+        }
+        .features { 
+            margin-top: 2rem; 
+            display: grid; 
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); 
+            gap: 1rem; 
+        }
+        .feature { 
+            padding: 1rem; 
+            background: #f8fafc; 
+            border-radius: 10px; 
+            transition: all 0.3s ease;
+        }
+        .feature:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+        }
+        .feature i { 
+            font-size: 2rem; 
+            color: #00b900; 
+            margin-bottom: 0.5rem; 
+        }
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            background: #00e400;
+            border-radius: 50%;
+            margin-right: 8px;
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🌬️ 智慧空氣品質機器人</h1>
+        <p><span class="status-indicator"></span>服務正常運行中</p>
+        <p>即時監測空氣品質，守護您和家人的健康</p>
+        
+        <div style="margin: 2rem 0;">
+            <a href="https://line.me/R/ti/p/@470kdmxx" class="cta-button" target="_blank">
+                <i class="fab fa-line"></i> 立即加入好友
+            </a>
+            <a href="/health" class="cta-button" style="background: #42a5f5;">
+                🔧 服務狀態
+            </a>
+        </div>
+        
+        <div class="features">
+            <div class="feature">
+                <i class="fas fa-search-location"></i>
+                <h4>即時查詢</h4>
+                <p>30+ 支援城市</p>
+            </div>
+            <div class="feature">
+                <i class="fas fa-chart-line"></i>
+                <h4>多城市比較</h4>
+                <p>智慧排序推薦</p>
+            </div>
+            <div class="feature">
+                <i class="fas fa-user-md"></i>
+                <h4>健康建議</h4>
+                <p>專業防護指導</p>
+            </div>
+            <div class="feature">
+                <i class="fas fa-bell"></i>
+                <h4>訂閱提醒</h4>
+                <p>每日報告+警報</p>
+            </div>
+            <div class="feature">
+                <i class="fas fa-map-marker-alt"></i>
+                <h4>GPS定位</h4>
+                <p>附近監測站查詢</p>
+            </div>
+            <div class="feature">
+                <i class="fas fa-robot"></i>
+                <h4>AI智慧</h4>
+                <p>自然語言理解</p>
+            </div>
+        </div>
+        
+        <div style="margin-top: 2rem; padding-top: 2rem; border-top: 1px solid #eee;">
+            <h3 style="color: #333; margin-bottom: 1rem;">🚀 快速測試</h3>
+            <div style="display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap; font-size: 0.9rem;">
+                <a href="/api/air-quality/taipei" style="color: #00b900; text-decoration: none;">📡 台北空氣品質API</a>
+                <a href="/api/air-quality/kaohsiung" style="color: #00b900; text-decoration: none;">📡 高雄空氣品質API</a>
+                <a href="/debug" style="color: #666; text-decoration: none;">🔍 系統診斷</a>
+            </div>
+        </div>
+        
+        <div style="margin-top: 2rem; padding-top: 1rem; border-top: 1px solid #eee; font-size: 0.85rem; color: #999;">
+            © 2025 智慧空氣品質機器人 | 用科技守護每一次呼吸 🌱
+        </div>
+    </div>
+</body>
+</html>
+      `);
+    }
+  } catch (error) {
+    console.error('首頁載入錯誤:', error);
+    res.status(500).send(`
+      <h1>服務臨時不可用</h1>
+      <p>請稍後再試，或聯繫技術支援</p>
+      <p>錯誤: ${error.message}</p>
+    `);
+  }
 });
 
-// 健康檢查端點
+// 健康檢查端點 - 增強診斷功能
 app.get('/health', (req, res) => {
+  const publicExists = fs.existsSync(path.join(__dirname, 'public'));
+  const indexExists = fs.existsSync(path.join(__dirname, 'public', 'index.html'));
+  
   res.json({ 
     status: 'OK', 
     message: 'LINE空氣品質機器人正常運行中！',
     timestamp: new Date().toISOString(),
-    uptime: process.uptime(),
+    uptime: Math.floor(process.uptime()),
+    environment: {
+      node_version: process.version,
+      platform: process.platform,
+      memory_usage: process.memoryUsage(),
+      public_folder_exists: publicExists,
+      index_html_exists: indexExists,
+      line_token_configured: !!process.env.LINE_CHANNEL_ACCESS_TOKEN,
+      line_secret_configured: !!process.env.LINE_CHANNEL_SECRET,
+      working_directory: __dirname
+    },
     features: [
       '即時空氣品質查詢',
       '多城市比較',
@@ -1256,16 +1437,85 @@ app.get('/health', (req, res) => {
 app.get('/api/air-quality/:city', async (req, res) => {
   try {
     const city = req.params.city;
+    console.log(`API請求 - 城市: ${city}`);
     const airQualityData = await getAirQuality(city);
     res.json(airQualityData);
   } catch (error) {
-    res.status(500).json({ error: '無法獲取空氣品質數據' });
+    console.error('API錯誤:', error);
+    res.status(500).json({ 
+      error: '無法獲取空氣品質數據',
+      details: error.message,
+      city: req.params.city,
+      timestamp: new Date().toISOString()
+    });
   }
+});
+
+// 調試端點 - 檢查服務狀態
+app.get('/debug', (req, res) => {
+  try {
+    res.json({
+      server_status: 'running',
+      timestamp: new Date().toISOString(),
+      node_version: process.version,
+      platform: process.platform,
+      uptime: Math.floor(process.uptime()),
+      memory_usage: process.memoryUsage(),
+      environment_variables: {
+        PORT: process.env.PORT,
+        NODE_ENV: process.env.NODE_ENV,
+        line_token_length: process.env.LINE_CHANNEL_ACCESS_TOKEN?.length || 0,
+        line_secret_length: process.env.LINE_CHANNEL_SECRET?.length || 0
+      },
+      file_system: {
+        current_directory: __dirname,
+        public_exists: fs.existsSync(path.join(__dirname, 'public')),
+        index_exists: fs.existsSync(path.join(__dirname, 'public', 'index.html')),
+        package_exists: fs.existsSync(path.join(__dirname, 'package.json'))
+      },
+      routes: [
+        'GET /',
+        'GET /health', 
+        'GET /debug',
+        'GET /api/air-quality/:city',
+        'POST /webhook'
+      ],
+      subscriptions_count: subscriptions.size,
+      location_cache_count: locationCache.size
+    });
+  } catch (error) {
+    res.status(500).json({
+      error: 'Debug endpoint error',
+      message: error.message
+    });
+  }
+});
+
+// 錯誤處理中間件
+app.use((err, req, res, next) => {
+  console.error('伺服器錯誤:', err);
+  res.status(500).json({
+    error: 'Internal Server Error',
+    message: err.message,
+    timestamp: new Date().toISOString()
+  });
+});
+
+// 404 處理
+app.use((req, res) => {
+  res.status(404).json({
+    error: 'Not Found',
+    path: req.path,
+    method: req.method,
+    message: '請求的路由不存在',
+    available_routes: ['/', '/health', '/debug', '/api/air-quality/:city'],
+    timestamp: new Date().toISOString()
+  });
 });
 
 // 啟動服務器
 const port = process.env.PORT || 3000;
-app.listen(port, () => {
+app.listen(port, '0.0.0.0', () => {
   console.log(`LINE智慧空氣品質機器人在端口 ${port} 上運行`);
   console.log('功能列表：');
   console.log('✅ 即時空氣品質查詢');
@@ -1274,4 +1524,21 @@ app.listen(port, () => {
   console.log('✅ 訂閱提醒系統');
   console.log('✅ GPS定位查詢');
   console.log('✅ 精美介紹網頁');
+  console.log(`🌐 服務網址: http://0.0.0.0:${port}`);
+  
+  // 檢查環境變數
+  if (!process.env.LINE_CHANNEL_ACCESS_TOKEN || !process.env.LINE_CHANNEL_SECRET) {
+    console.warn('⚠️ 警告：LINE Bot 環境變數未完整設定');
+    console.warn('請在 Render Dashboard 設定以下環境變數：');
+    console.warn('- LINE_CHANNEL_ACCESS_TOKEN');
+    console.warn('- LINE_CHANNEL_SECRET');
+  } else {
+    console.log('✅ LINE Bot 環境變數設定完成');
+  }
+  
+  // 檢查文件系統
+  console.log('📁 文件系統檢查：');
+  console.log(`- 工作目錄: ${__dirname}`);
+  console.log(`- public 資料夾存在: ${fs.existsSync(path.join(__dirname, 'public'))}`);
+  console.log(`- index.html 存在: ${fs.existsSync(path.join(__dirname, 'public', 'index.html'))}`);
 });
