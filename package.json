@@ -1,37 +1,149 @@
 {
-  "name": "line-air-quality-bot",
-  "version": "1.0.0",
-  "description": "LINE機器人：即時空氣品質查詢，支援自然語言和圖文回覆",
+  "name": "smart-air-quality-line-bot",
+  "version": "2.0.0",
+  "description": "智慧空氣品質 LINE 機器人 - 提供即時空氣品質查詢、多城市比較、健康建議和 GPS 定位功能",
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
     "dev": "nodemon index.js",
-    "test": "node test.js",
-    "test:local": "TEST_URL=http://localhost:3000 node test.js",
-    "build": "echo 'No build step required'",
-    "lint": "echo 'No linting configured'",
-    "health": "curl -f http://localhost:3000/health || exit 1"
+    "test": "node test_script.js",
+    "test:local": "TEST_URL=http://localhost:3000 node test_script.js",
+    "test:production": "node test_script.js",
+    "build": "echo 'No build step required for Node.js application'",
+    "lint": "echo 'ESLint not configured - consider adding for production'",
+    "health": "curl -f http://localhost:3000/health || exit 1",
+    "logs": "echo 'Checking application logs...' && tail -n 50 /var/log/app.log 2>/dev/null || echo 'No logs found'",
+    "clean": "echo 'Cleaning temporary files...' && rm -rf node_modules/.cache 2>/dev/null || true",
+    "security-check": "npm audit --audit-level moderate",
+    "update-deps": "npm update && npm audit fix"
   },
   "keywords": [
     "line-bot",
     "air-quality",
     "aqi",
-    "taiwan",
     "pm2.5",
-    "environmental"
+    "taiwan",
+    "environmental",
+    "health",
+    "weather",
+    "api",
+    "real-time",
+    "gps",
+    "smart",
+    "ai",
+    "chatbot",
+    "flex-message",
+    "webhook"
   ],
-  "author": "你的名字",
+  "author": {
+    "name": "Smart Air Quality Bot Team",
+    "email": "contact@airquality-bot.com",
+    "url": "https://github.com/your-username/smart-air-quality-bot"
+  },
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-username/smart-air-quality-bot.git"
+  },
+  "bugs": {
+    "url": "https://github.com/your-username/smart-air-quality-bot/issues"
+  },
+  "homepage": "https://github.com/your-username/smart-air-quality-bot#readme",
   "dependencies": {
     "@line/bot-sdk": "^9.3.0",
     "express": "^4.18.2",
-    "axios": "^1.6.0",
+    "axios": "^1.6.2",
     "node-cron": "^3.0.3"
   },
   "devDependencies": {
-    "nodemon": "^3.0.1"
+    "nodemon": "^3.0.2"
   },
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=18.0.0",
+    "npm": ">=8.0.0"
+  },
+  "config": {
+    "port": 3000,
+    "cache_duration": 300000,
+    "user_state_timeout": 600000,
+    "location_cache_timeout": 3600000
+  },
+  "nodemonConfig": {
+    "watch": [
+      "index.js",
+      "package.json"
+    ],
+    "ext": "js,json,html",
+    "ignore": [
+      "node_modules/",
+      "*.log",
+      ".git/"
+    ],
+    "delay": 1000
+  },
+  "deployment": {
+    "platform": "render",
+    "build_command": "npm install",
+    "start_command": "npm start",
+    "environment": "production",
+    "auto_deploy": true
+  },
+  "features": [
+    "real_time_air_quality_query",
+    "multi_city_comparison",
+    "smart_health_advice", 
+    "gps_location_query",
+    "natural_language_processing",
+    "flex_message_interface",
+    "api_caching",
+    "error_handling",
+    "auto_cleanup"
+  ],
+  "supported_cities": {
+    "taiwan": [
+      "taipei", "kaohsiung", "taichung", "tainan", "new-taipei", 
+      "taoyuan", "keelung", "hsinchu", "miaoli", "changhua",
+      "nantou", "yunlin", "chiayi", "pingtung", "yilan",
+      "hualien", "taitung", "penghu", "kinmen", "matsu"
+    ],
+    "international": [
+      "beijing", "shanghai", "guangzhou", "shenzhen", "hong-kong", "macau",
+      "tokyo", "osaka", "seoul", "busan", "bangkok", "singapore",
+      "kuala-lumpur", "jakarta", "manila", "hanoi", "ho-chi-minh-city",
+      "mumbai", "delhi", "london", "paris", "berlin", "rome", "madrid",
+      "new-york", "los-angeles", "chicago", "toronto", "vancouver",
+      "sydney", "melbourne"
+    ]
+  },
+  "api_endpoints": {
+    "health_check": "/health",
+    "air_quality": "/api/air-quality/:city",
+    "statistics": "/api/stats", 
+    "webhook": "/webhook",
+    "home": "/"
+  },
+  "environment_variables": {
+    "required": [
+      "LINE_CHANNEL_ACCESS_TOKEN",
+      "LINE_CHANNEL_SECRET"
+    ],
+    "optional": [
+      "WAQI_TOKEN",
+      "PORT",
+      "NODE_ENV"
+    ]
+  },
+  "monitoring": {
+    "health_check_interval": "*/5 * * * *",
+    "cache_cleanup_interval": "*/5 * * * *",
+    "log_retention_days": 7,
+    "performance_metrics": true
+  },
+  "security": {
+    "helmet": false,
+    "cors": false,
+    "rate_limiting": false,
+    "input_validation": true,
+    "error_sanitization": true
   }
 }

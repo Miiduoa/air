@@ -7,163 +7,332 @@
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
+        
         body { 
-            font-family: 'Segoe UI', sans-serif; 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
             background: linear-gradient(-45deg, #667eea, #764ba2, #6b73ff, #9644ff); 
             background-size: 400% 400%;
-            animation: gradient-shift 8s ease infinite;
+            animation: gradientShift 8s ease infinite;
             min-height: 100vh; 
-            padding: 2rem 1rem;
+            padding: 1rem;
+            overflow-x: hidden;
         }
-        @keyframes gradient-shift {
+        
+        @keyframes gradientShift {
             0% { background-position: 0% 50%; }
             50% { background-position: 100% 50%; }
             100% { background-position: 0% 50%; }
         }
+        
         .main-container {
             max-width: 1200px;
             margin: 0 auto;
         }
+        
+        /* 頂部區域 */
         .hero-section { 
-            background: white; 
+            background: rgba(255, 255, 255, 0.95); 
+            backdrop-filter: blur(10px);
             padding: 3rem; 
-            border-radius: 20px; 
-            box-shadow: 0 20px 60px rgba(0,0,0,0.1); 
+            border-radius: 25px; 
+            box-shadow: 0 25px 80px rgba(0,0,0,0.15); 
             text-align: center; 
-            margin-bottom: 3rem;
+            margin-bottom: 2rem;
+            position: relative;
+            overflow: hidden;
         }
-        h1 { color: #333; margin-bottom: 1rem; font-size: 2.5rem; }
-        p { color: #666; margin-bottom: 2rem; font-size: 1.2rem; line-height: 1.6; }
-        .cta-button { 
-            display: inline-block; 
-            background: #00b900; 
-            color: white; 
-            padding: 15px 40px; 
-            border-radius: 50px; 
-            text-decoration: none; 
-            font-weight: 600; 
-            transition: all 0.3s ease; 
-            margin: 0.5rem;
+        
+        .hero-section::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(45deg, rgba(76, 175, 80, 0.1), rgba(66, 165, 245, 0.1));
+            z-index: -1;
         }
-        .cta-button:hover { 
-            transform: translateY(-3px); 
-            box-shadow: 0 10px 30px rgba(0,185,0,0.3); 
+        
+        h1 { 
+            color: #2c3e50; 
+            margin-bottom: 1rem; 
+            font-size: 2.8rem; 
+            font-weight: 700;
+            background: linear-gradient(45deg, #4CAF50, #2196F3);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
-        .features { 
-            margin-top: 2rem; 
-            display: grid; 
-            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); 
-            gap: 1rem; 
+        
+        .subtitle {
+            color: #34495e;
+            font-size: 1.3rem;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
         }
-        .feature { 
-            padding: 1rem; 
-            background: #f8fafc; 
-            border-radius: 10px; 
-            transition: all 0.3s ease;
-            cursor: pointer;
+        
+        .description { 
+            color: #7f8c8d; 
+            margin-bottom: 2.5rem; 
+            font-size: 1.1rem; 
+            line-height: 1.8;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
         }
-        .feature:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 10px 20px rgba(0,0,0,0.1);
-        }
-        .feature i { 
-            font-size: 2rem; 
-            color: #00b900; 
-            margin-bottom: 0.5rem; 
-        }
+        
         .status-indicator {
-            display: inline-block;
+            display: inline-flex;
+            align-items: center;
+            background: rgba(76, 175, 80, 0.1);
+            padding: 0.5rem 1rem;
+            border-radius: 25px;
+            margin-bottom: 1rem;
+            border: 2px solid rgba(76, 175, 80, 0.3);
+        }
+        
+        .status-dot {
             width: 12px;
             height: 12px;
-            background: #00e400;
+            background: #4CAF50;
             border-radius: 50%;
             margin-right: 8px;
             animation: pulse 2s infinite;
         }
+        
         @keyframes pulse {
-            0% { opacity: 1; }
-            50% { opacity: 0.5; }
-            100% { opacity: 1; }
+            0% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.7; transform: scale(1.1); }
+            100% { opacity: 1; transform: scale(1); }
         }
         
-        /* 聊天展示區域 */
+        /* 按鈕樣式 */
+        .cta-section {
+            margin: 2.5rem 0;
+        }
+        
+        .cta-button { 
+            display: inline-block; 
+            background: linear-gradient(45deg, #4CAF50, #45a049);
+            color: white; 
+            padding: 15px 35px; 
+            border-radius: 50px; 
+            text-decoration: none; 
+            font-weight: 600; 
+            font-size: 1.1rem;
+            transition: all 0.3s ease; 
+            margin: 0.5rem;
+            box-shadow: 0 4px 15px rgba(76, 175, 80, 0.3);
+            border: none;
+            cursor: pointer;
+        }
+        
+        .cta-button:hover { 
+            transform: translateY(-3px); 
+            box-shadow: 0 8px 25px rgba(76, 175, 80, 0.4);
+            background: linear-gradient(45deg, #45a049, #4CAF50);
+        }
+        
+        .cta-button.secondary {
+            background: linear-gradient(45deg, #2196F3, #1976D2);
+            box-shadow: 0 4px 15px rgba(33, 150, 243, 0.3);
+        }
+        
+        .cta-button.secondary:hover {
+            box-shadow: 0 8px 25px rgba(33, 150, 243, 0.4);
+            background: linear-gradient(45deg, #1976D2, #2196F3);
+        }
+        
+        /* 功能卡片 */
+        .features { 
+            margin-top: 3rem; 
+            display: grid; 
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); 
+            gap: 1.5rem; 
+        }
+        
+        .feature { 
+            padding: 2rem 1.5rem; 
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(10px);
+            border-radius: 20px; 
+            transition: all 0.4s ease;
+            cursor: pointer;
+            border: 2px solid transparent;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .feature::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(45deg, rgba(76, 175, 80, 0.05), rgba(33, 150, 243, 0.05));
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            z-index: -1;
+        }
+        
+        .feature:hover {
+            transform: translateY(-8px) scale(1.02);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.15);
+            border-color: rgba(76, 175, 80, 0.3);
+        }
+        
+        .feature:hover::before {
+            opacity: 1;
+        }
+        
+        .feature i { 
+            font-size: 3rem; 
+            color: #4CAF50; 
+            margin-bottom: 1rem;
+            transition: all 0.3s ease;
+        }
+        
+        .feature:hover i {
+            color: #2196F3;
+            transform: scale(1.1);
+        }
+        
+        .feature h4 {
+            color: #2c3e50;
+            margin-bottom: 0.8rem;
+            font-size: 1.2rem;
+            font-weight: 600;
+        }
+        
+        .feature p {
+            color: #7f8c8d;
+            font-size: 0.95rem;
+            line-height: 1.5;
+        }
+        
+        /* 聊天演示區域 */
         .chat-demos {
-            background: white;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
             padding: 3rem;
-            border-radius: 20px;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.1);
-            margin-bottom: 3rem;
+            border-radius: 25px;
+            box-shadow: 0 25px 80px rgba(0,0,0,0.15);
+            margin-bottom: 2rem;
+        }
+        
+        .chat-demos h2 {
+            text-align: center;
+            margin-bottom: 2rem;
+            color: #2c3e50;
+            font-size: 2.2rem;
+            font-weight: 700;
+        }
+        
+        .demo-description {
+            text-align: center;
+            margin-bottom: 2rem;
+            color: #7f8c8d;
+            font-size: 1.1rem;
+            line-height: 1.6;
         }
         
         .demo-tabs {
             display: flex;
             justify-content: center;
             flex-wrap: wrap;
-            gap: 0.5rem;
+            gap: 0.8rem;
             margin-bottom: 2rem;
-            border-bottom: 2px solid #f0f0f0;
+            padding-bottom: 1rem;
+            border-bottom: 2px solid rgba(0,0,0,0.1);
         }
         
         .demo-tab {
-            padding: 0.8rem 1.5rem;
-            background: #f8fafc;
-            border: none;
-            border-radius: 20px 20px 0 0;
+            padding: 1rem 2rem;
+            background: rgba(255, 255, 255, 0.8);
+            border: 2px solid rgba(0,0,0,0.1);
+            border-radius: 25px;
             cursor: pointer;
             transition: all 0.3s ease;
-            font-weight: 500;
-            color: #666;
-            font-size: 0.9rem;
+            font-weight: 600;
+            color: #7f8c8d;
+            font-size: 0.95rem;
+            backdrop-filter: blur(10px);
+        }
+        
+        .demo-tab:hover {
+            background: rgba(76, 175, 80, 0.1);
+            border-color: rgba(76, 175, 80, 0.3);
+            transform: translateY(-2px);
         }
         
         .demo-tab.active {
-            background: #00b900;
+            background: linear-gradient(45deg, #4CAF50, #45a049);
             color: white;
-            transform: translateY(2px);
+            border-color: #4CAF50;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(76, 175, 80, 0.3);
         }
         
         .chat-container {
-            max-width: 400px;
-            margin: 0 auto;
+            max-width: 450px;
+            margin: 2rem auto;
             background: #f8fafc;
-            border-radius: 20px;
+            border-radius: 25px;
             padding: 1rem;
             min-height: 500px;
             position: relative;
-            border: 3px solid #ddd;
+            border: 3px solid rgba(0,0,0,0.1);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
         }
         
         .chat-header {
             display: flex;
             align-items: center;
-            padding: 1rem;
-            background: #00b900;
+            padding: 1.5rem;
+            background: linear-gradient(45deg, #4CAF50, #45a049);
             color: white;
-            border-radius: 15px 15px 0 0;
+            border-radius: 20px 20px 0 0;
             margin: -1rem -1rem 1rem -1rem;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
         }
         
         .chat-header img {
-            width: 40px;
-            height: 40px;
+            width: 45px;
+            height: 45px;
             border-radius: 50%;
             margin-right: 1rem;
             background: white;
-            padding: 5px;
+            padding: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .chat-info h3 {
+            font-size: 1.1rem;
+            font-weight: 700;
+            margin-bottom: 0.2rem;
+        }
+        
+        .chat-info p {
+            font-size: 0.9rem;
+            opacity: 0.9;
         }
         
         .chat-messages {
             height: 400px;
             overflow-y: auto;
-            padding: 0.5rem;
+            padding: 1rem;
+            scroll-behavior: smooth;
         }
         
         .message {
-            margin: 1rem 0;
+            margin: 1.5rem 0;
             display: flex;
             align-items: flex-end;
             opacity: 0;
-            animation: messageAppear 0.5s ease forwards;
+            animation: messageAppear 0.6s ease forwards;
         }
         
         .message.user {
@@ -176,30 +345,32 @@
         
         .message-bubble {
             max-width: 80%;
-            padding: 0.8rem 1.2rem;
-            border-radius: 18px;
-            font-size: 0.9rem;
-            line-height: 1.4;
+            padding: 1rem 1.5rem;
+            border-radius: 20px;
+            font-size: 0.95rem;
+            line-height: 1.5;
             position: relative;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
         }
         
         .message.user .message-bubble {
-            background: #00b900;
+            background: linear-gradient(45deg, #4CAF50, #45a049);
             color: white;
-            border-bottom-right-radius: 5px;
+            border-bottom-right-radius: 8px;
         }
         
         .message.bot .message-bubble {
             background: white;
-            color: #333;
-            border: 1px solid #e1e8ed;
-            border-bottom-left-radius: 5px;
+            color: #2c3e50;
+            border: 2px solid rgba(0,0,0,0.1);
+            border-bottom-left-radius: 8px;
         }
         
         .message-time {
-            font-size: 0.7rem;
-            color: #999;
-            margin: 0 0.5rem;
+            font-size: 0.75rem;
+            color: #95a5a6;
+            margin: 0 0.8rem;
+            font-weight: 500;
         }
         
         .typing-indicator {
@@ -211,19 +382,20 @@
         .typing-dots {
             display: inline-flex;
             align-items: center;
-            padding: 0.8rem 1.2rem;
+            padding: 1rem 1.5rem;
             background: white;
-            border: 1px solid #e1e8ed;
-            border-radius: 18px;
-            border-bottom-left-radius: 5px;
+            border: 2px solid rgba(0,0,0,0.1);
+            border-radius: 20px;
+            border-bottom-left-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
         }
         
         .typing-dots span {
-            width: 6px;
-            height: 6px;
-            background: #999;
+            width: 8px;
+            height: 8px;
+            background: #95a5a6;
             border-radius: 50%;
-            margin: 0 2px;
+            margin: 0 3px;
             animation: typing 1.5s infinite;
         }
         
@@ -231,14 +403,158 @@
         .typing-dots span:nth-child(3) { animation-delay: 0.4s; }
         
         @keyframes typing {
-            0%, 60%, 100% { opacity: 0.3; }
-            30% { opacity: 1; }
+            0%, 60%, 100% { opacity: 0.3; transform: scale(0.8); }
+            30% { opacity: 1; transform: scale(1); }
         }
         
         @keyframes messageAppear {
             from {
                 opacity: 0;
-                transform: translateY(20px);
+                transform: translateY(20px) scale(0.9);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+        
+        .flex-message-preview {
+            background: linear-gradient(45deg, rgba(240, 248, 255, 0.8), rgba(230, 247, 255, 0.8));
+            border: 2px dashed #4CAF50;
+            border-radius: 15px;
+            padding: 1.2rem;
+            margin: 0.5rem 0;
+            font-size: 0.85rem;
+            color: #2c3e50;
+            text-align: center;
+            backdrop-filter: blur(5px);
+        }
+        
+        .location-message {
+            background: linear-gradient(45deg, rgba(76, 175, 80, 0.1), rgba(33, 150, 243, 0.1));
+            border: 2px solid rgba(76, 175, 80, 0.3);
+            border-radius: 12px;
+            padding: 1rem;
+            margin: 0.5rem 0;
+            font-size: 0.9rem;
+            color: #2c3e50;
+        }
+        
+        /* 底部區域 */
+        .footer-section {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            padding: 2rem;
+            border-radius: 25px;
+            box-shadow: 0 25px 80px rgba(0,0,0,0.15);
+            text-align: center;
+        }
+        
+        .footer-section h3 {
+            color: #2c3e50;
+            margin-bottom: 1.5rem;
+            font-size: 1.4rem;
+        }
+        
+        .quick-links {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-bottom: 2rem;
+        }
+        
+        .quick-link {
+            color: #4CAF50;
+            text-decoration: none;
+            padding: 0.8rem 1.5rem;
+            border: 2px solid rgba(76, 175, 80, 0.3);
+            border-radius: 25px;
+            transition: all 0.3s ease;
+            font-weight: 500;
+            background: rgba(76, 175, 80, 0.05);
+        }
+        
+        .quick-link:hover {
+            background: rgba(76, 175, 80, 0.1);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(76, 175, 80, 0.2);
+        }
+        
+        .copyright {
+            margin-top: 2rem;
+            padding-top: 1.5rem;
+            border-top: 2px solid rgba(0,0,0,0.1);
+            font-size: 0.9rem;
+            color: #95a5a6;
+            line-height: 1.6;
+        }
+        
+        /* 響應式設計 */
+        @media (max-width: 768px) {
+            .hero-section, .chat-demos, .footer-section {
+                padding: 2rem 1.5rem;
+            }
+            
+            h1 { font-size: 2.2rem; }
+            
+            .features {
+                grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+                gap: 1rem;
+            }
+            
+            .demo-tabs {
+                gap: 0.5rem;
+            }
+            
+            .demo-tab {
+                padding: 0.8rem 1.2rem;
+                font-size: 0.85rem;
+            }
+            
+            .chat-container {
+                max-width: 100%;
+                margin: 1rem auto;
+            }
+            
+            .quick-links {
+                flex-direction: column;
+                align-items: center;
+            }
+            
+            .cta-button {
+                display: block;
+                margin: 0.5rem auto;
+                max-width: 280px;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            body { padding: 0.5rem; }
+            
+            h1 { font-size: 1.8rem; }
+            .subtitle { font-size: 1.1rem; }
+            .description { font-size: 1rem; }
+            
+            .feature {
+                padding: 1.5rem 1rem;
+            }
+            
+            .feature i {
+                font-size: 2.5rem;
+            }
+        }
+        
+        /* 載入動畫 */
+        .loading {
+            opacity: 0;
+            animation: fadeInUp 0.8s ease forwards;
+        }
+        
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
             }
             to {
                 opacity: 1;
@@ -246,56 +562,51 @@
             }
         }
         
-        .demo-description {
-            text-align: center;
-            margin-bottom: 2rem;
-            color: #666;
-            font-size: 1.1rem;
+        /* 滾動條樣式 */
+        .chat-messages::-webkit-scrollbar {
+            width: 6px;
         }
         
-        .flex-message-preview {
-            background: #f0f8ff;
-            border: 2px dashed #00b900;
-            border-radius: 15px;
-            padding: 1rem;
-            margin: 0.5rem 0;
-            font-size: 0.8rem;
-            color: #666;
-            text-align: center;
+        .chat-messages::-webkit-scrollbar-track {
+            background: rgba(0,0,0,0.1);
+            border-radius: 3px;
         }
         
-        @media (max-width: 768px) {
-            .hero-section, .chat-demos {
-                padding: 2rem 1.5rem;
-            }
-            h1 { font-size: 2rem; }
-            .demo-tabs {
-                gap: 0.2rem;
-            }
-            .demo-tab {
-                padding: 0.6rem 1rem;
-                font-size: 0.8rem;
-            }
-            .chat-container {
-                max-width: 100%;
-            }
+        .chat-messages::-webkit-scrollbar-thumb {
+            background: rgba(76, 175, 80, 0.5);
+            border-radius: 3px;
+        }
+        
+        .chat-messages::-webkit-scrollbar-thumb:hover {
+            background: rgba(76, 175, 80, 0.7);
+        }
+        
+        /* 高亮效果 */
+        .highlight {
+            background: linear-gradient(45deg, rgba(255, 235, 59, 0.3), rgba(255, 193, 7, 0.3));
+            padding: 0.2rem 0.5rem;
+            border-radius: 8px;
+            font-weight: 600;
         }
     </style>
 </head>
 <body>
     <div class="main-container">
-        <!-- Hero Section -->
-        <div class="hero-section">
+        <!-- 主要介紹區域 -->
+        <div class="hero-section loading">
             <h1>🌬️ 智慧空氣品質機器人</h1>
-            <p><span class="status-indicator"></span>服務正常運行中</p>
-            <p>即時監測空氣品質，守護您和家人的健康</p>
+            <div class="status-indicator">
+                <div class="status-dot"></div>
+                <span class="subtitle">服務正常運行中</span>
+            </div>
+            <p class="description">即時監測空氣品質，提供專業健康建議，守護您和家人的每一次呼吸</p>
             
-            <div style="margin: 2rem 0;">
+            <div class="cta-section">
                 <a href="https://line.me/R/ti/p/@470kdmxx" class="cta-button" target="_blank">
                     <i class="fab fa-line"></i> 立即加入好友
                 </a>
-                <a href="/health" class="cta-button" style="background: #42a5f5;">
-                    🔧 服務狀態
+                <a href="/health" class="cta-button secondary">
+                    <i class="fas fa-heartbeat"></i> 服務狀態
                 </a>
             </div>
             
@@ -303,60 +614,60 @@
                 <div class="feature" onclick="showDemo('query')">
                     <i class="fas fa-search-location"></i>
                     <h4>即時查詢</h4>
-                    <p>30+ 支援城市</p>
+                    <p>支援全球 <span class="highlight">50+</span> 主要城市，數據每小時更新</p>
                 </div>
                 <div class="feature" onclick="showDemo('compare')">
                     <i class="fas fa-chart-line"></i>
-                    <h4>多城市比較</h4>
-                    <p>智慧排序推薦</p>
+                    <h4>智慧比較</h4>
+                    <p>多城市對比分析，<span class="highlight">AI 推薦</span>最佳選擇</p>
                 </div>
                 <div class="feature" onclick="showDemo('health')">
                     <i class="fas fa-user-md"></i>
                     <h4>健康建議</h4>
-                    <p>專業防護指導</p>
-                </div>
-                <div class="feature" onclick="showDemo('subscribe')">
-                    <i class="fas fa-bell"></i>
-                    <h4>訂閱提醒</h4>
-                    <p>每日報告+警報</p>
+                    <p>專業醫學建議，<span class="highlight">個人化</span>防護指導</p>
                 </div>
                 <div class="feature" onclick="showDemo('location')">
                     <i class="fas fa-map-marker-alt"></i>
-                    <h4>GPS定位</h4>
-                    <p>附近監測站查詢</p>
+                    <h4>GPS 定位</h4>
+                    <p>自動定位查詢，<span class="highlight">附近監測站</span>一目了然</p>
                 </div>
-                <div class="feature" onclick="showDemo('ai')">
-                    <i class="fas fa-robot"></i>
-                    <h4>AI智慧</h4>
-                    <p>自然語言理解</p>
+                <div class="feature" onclick="showDemo('smart')">
+                    <i class="fas fa-brain"></i>
+                    <h4>智慧問答</h4>
+                    <p><span class="highlight">自然語言</span>理解，如同真人對話</p>
+                </div>
+                <div class="feature" onclick="showDemo('alert')">
+                    <i class="fas fa-bell"></i>
+                    <h4>即時警報</h4>
+                    <p>空品惡化即時通知，<span class="highlight">健康零延遲</span></p>
                 </div>
             </div>
         </div>
         
-        <!-- Chat Demos Section -->
-        <div class="chat-demos">
-            <h2 style="text-align: center; margin-bottom: 2rem; color: #333;">💬 功能展示</h2>
-            <p class="demo-description">點擊上方功能卡片或下方標籤，查看真實對話範例</p>
+        <!-- 聊天演示區域 -->
+        <div class="chat-demos loading">
+            <h2>💬 功能展示</h2>
+            <p class="demo-description">體驗真實對話範例，了解機器人的強大功能</p>
             
             <div class="demo-tabs">
-                <button class="demo-tab active" onclick="showDemo('query')">🔍 即時查詢</button>
-                <button class="demo-tab" onclick="showDemo('compare')">📊 城市比較</button>
-                <button class="demo-tab" onclick="showDemo('health')">💊 健康建議</button>
-                <button class="demo-tab" onclick="showDemo('subscribe')">🔔 訂閱功能</button>
-                <button class="demo-tab" onclick="showDemo('location')">📍 GPS定位</button>
-                <button class="demo-tab" onclick="showDemo('ai')">🤖 AI智慧</button>
+                <div class="demo-tab active" onclick="showDemo('query')">🔍 即時查詢</div>
+                <div class="demo-tab" onclick="showDemo('compare')">📊 城市比較</div>
+                <div class="demo-tab" onclick="showDemo('health')">💊 健康建議</div>
+                <div class="demo-tab" onclick="showDemo('location')">📍 GPS 定位</div>
+                <div class="demo-tab" onclick="showDemo('smart')">🤖 智慧問答</div>
+                <div class="demo-tab" onclick="showDemo('alert')">🚨 即時警報</div>
             </div>
             
             <div class="chat-container">
                 <div class="chat-header">
-                    <img src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIHZpZXdCb3g9IjAgMCA0MCA0MCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPGNpcmNsZSBjeD0iMjAiIGN5PSIyMCIgcj0iMjAiIGZpbGw9IiMwMGI5MDAiLz4KPHRleHQgeD0iMjAiIHk9IjI2IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSJ3aGl0ZSIgZm9udC1zaXplPSIyMCI+8J+MrjwvdGV4dD4KPC9zdmc+" alt="Bot Avatar">
-                    <div>
-                        <div style="font-weight: bold;">智慧空氣品質機器人</div>
-                        <div style="font-size: 0.8rem; opacity: 0.9;">線上</div>
+                    <img src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIHZpZXdCb3g9IjAgMCA0MCA0MCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPGNpcmNsZSBjeD0iMjAiIGN5PSIyMCIgcj0iMjAiIGZpbGw9IiM0Q0FGNTAMJ4KPHRleHQgeD0iMjAiIHk9IjI2IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSJ3aGl0ZSIgZm9udC1zaXplPSIyMCI+8J+MrjwvdGV4dD4KPC9zdmc+" alt="Bot Avatar">
+                    <div class="chat-info">
+                        <h3>智慧空氣品質機器人</h3>
+                        <p>🟢 線上中 - 隨時為您服務</p>
                     </div>
                 </div>
                 <div class="chat-messages" id="chatMessages">
-                    <!-- Messages will be inserted here -->
+                    <!-- 對話訊息將在這裡動態插入 -->
                 </div>
                 <div class="typing-indicator" id="typingIndicator">
                     <div class="typing-dots">
@@ -368,22 +679,34 @@
             </div>
         </div>
         
-        <!-- Quick Links -->
-        <div class="hero-section">
-            <h3 style="color: #333; margin-bottom: 1rem;">🚀 快速測試</h3>
-            <div style="display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap; font-size: 0.9rem;">
-                <a href="/api/air-quality/taipei" style="color: #00b900; text-decoration: none;">📡 台北空氣品質API</a>
-                <a href="/api/air-quality/kaohsiung" style="color: #00b900; text-decoration: none;">📡 高雄空氣品質API</a>
-                <a href="/debug" style="color: #666; text-decoration: none;">🔍 系統診斷</a>
+        <!-- 底部連結區域 -->
+        <div class="footer-section loading">
+            <h3>🚀 立即體驗</h3>
+            <div class="quick-links">
+                <a href="/api/air-quality/taipei" class="quick-link">
+                    <i class="fas fa-code"></i> 台北 API 測試
+                </a>
+                <a href="/api/air-quality/kaohsiung" class="quick-link">
+                    <i class="fas fa-code"></i> 高雄 API 測試
+                </a>
+                <a href="/api/stats" class="quick-link">
+                    <i class="fas fa-chart-bar"></i> 服務統計
+                </a>
+                <a href="/health" class="quick-link">
+                    <i class="fas fa-stethoscope"></i> 健康檢查
+                </a>
             </div>
             
-            <div style="margin-top: 2rem; padding-top: 1rem; border-top: 1px solid #eee; font-size: 0.85rem; color: #999;">
-                © 2025 智慧空氣品質機器人 | 用科技守護每一次呼吸 🌱
+            <div class="copyright">
+                <p><strong>© 2025 智慧空氣品質機器人</strong></p>
+                <p>🌱 用科技守護每一次呼吸 | 🔒 隱私保護 | 📱 跨平台支援</p>
+                <p>💡 <em>讓 AI 成為您的專屬空氣品質顧問</em></p>
             </div>
         </div>
     </div>
 
 <script>
+// 演示對話數據
 const demos = {
     query: {
         title: '🔍 即時空氣品質查詢',
@@ -391,9 +714,14 @@ const demos = {
         messages: [
             { type: 'user', text: '台北空氣品質', time: '14:30' },
             { type: 'bot', text: '正在查詢台北的空氣品質數據...', time: '14:30', delay: 1000 },
-            { type: 'bot', content: 'flex', title: '台北空氣品質報告', 
-              preview: '🌬️ AQI: 65 (普通)\\n📍 台北市\\n😷 建議配戴一般口罩\\n🏃‍♂️ 適合散步、瑜伽', 
-              time: '14:31', delay: 2500 }
+            { 
+                type: 'bot', 
+                content: 'flex', 
+                title: '🌬️ 台北空氣品質報告', 
+                preview: '📍 台北市\\n💨 AQI: 65 (普通)\\n😷 建議配戴一般口罩\\n🏃‍♂️ 適合散步、瑜伽\\n\\n📊 詳細數據：\\n• PM2.5: 23 μg/m³\\n• PM10: 45 μg/m³\\n• 臭氧: 87 ppb', 
+                time: '14:31', 
+                delay: 2500 
+            }
         ]
     },
     compare: {
@@ -401,10 +729,15 @@ const demos = {
         description: '一次比較多個城市，智慧排序推薦最佳選擇',
         messages: [
             { type: 'user', text: '比較台北高雄台中', time: '15:20' },
-            { type: 'bot', text: '正在比較三個城市的空氣品質...', time: '15:20', delay: 1000 },
-            { type: 'bot', content: 'flex', title: '🏆 多城市比較結果', 
-              preview: '🥇 台中 AQI: 45 (良好)\\n🥈 台北 AQI: 65 (普通)\\n🥉 高雄 AQI: 85 (普通)\\n\\n✈️ 推薦前往台中！', 
-              time: '15:21', delay: 3000 }
+            { type: 'bot', text: '正在比較三個城市的空氣品質，請稍候...', time: '15:20', delay: 1000 },
+            { 
+                type: 'bot', 
+                content: 'flex', 
+                title: '🏆 多城市比較結果', 
+                preview: '📊 排名結果 (由佳至差)：\\n\\n🥇 台中 AQI: 45 (良好)\\n🥈 台北 AQI: 65 (普通)\\n🥉 高雄 AQI: 85 (普通)\\n\\n🎯 智慧建議：\\n✈️ 推薦前往台中！空氣品質良好，適合戶外活動', 
+                time: '15:21', 
+                delay: 3000 
+            }
         ]
     },
     health: {
@@ -412,43 +745,79 @@ const demos = {
         description: '根據空氣品質提供個人化健康防護指導',
         messages: [
             { type: 'user', text: '高雄空氣品質', time: '16:45' },
-            { type: 'bot', content: 'flex', title: '高雄空氣品質報告', 
-              preview: '😰 AQI: 120 (不健康)\\n🚨 建議減少戶外活動\\n😷 必須配戴N95口罩\\n🏠 關閉門窗使用空氣清淨機', 
-              time: '16:46', delay: 2000 },
+            { 
+                type: 'bot', 
+                content: 'flex', 
+                title: '🌬️ 高雄空氣品質報告', 
+                preview: '😰 AQI: 120 (不健康)\\n🚨 建議減少戶外活動\\n😷 必須配戴 N95 口罩\\n🏠 關閉門窗使用空氣清淨機', 
+                time: '16:46', 
+                delay: 2000 
+            },
             { type: 'user', text: '可以運動嗎？', time: '16:47' },
-            { type: 'bot', text: '目前高雄AQI為120，建議：\\n\\n🏠 僅建議室內輕度活動\\n🚫 避免戶外運動\\n💪 可在室內做瑜伽、伸展\\n⚠️ 敏感族群請特別注意', time: '16:47', delay: 1500 }
-        ]
-    },
-    subscribe: {
-        title: '🔔 訂閱提醒服務',
-        description: '每日推送空氣品質報告，惡化時立即警報',
-        messages: [
-            { type: 'user', text: '訂閱台北', time: '09:15' },
-            { type: 'bot', text: '✅ 已成功訂閱台北的空氣品質提醒！\\n\\n📅 每日 08:00 推送報告\\n🚨 AQI>100 時緊急警報\\n\\n輸入「我的訂閱」查看清單', time: '09:15', delay: 1000 },
-            { type: 'user', text: '我的訂閱', time: '09:16' },
-            { type: 'bot', text: '📋 您的訂閱清單：\\n\\n1. 台北\\n\\n⚙️ 設定：\\n• 📅 每日報告：已開啟\\n• 🚨 緊急警報：已開啟\\n• ⚠️ 警報閾值：AQI > 100', time: '09:16', delay: 1200 }
+            { 
+                type: 'bot', 
+                text: '目前高雄 AQI 為 120，屬於不健康等級：\\n\\n🏠 僅建議室內輕度活動\\n🚫 避免戶外運動\\n💪 可在室內做瑜伽、伸展\\n⚠️ 敏感族群請特別注意\\n\\n如果一定要外出，請務必配戴 N95 口罩並減少暴露時間。', 
+                time: '16:47', 
+                delay: 1500 
+            }
         ]
     },
     location: {
-        title: '📍 GPS定位查詢',
+        title: '📍 GPS 定位查詢',
         description: '分享位置即可查詢附近監測站的空氣品質',
         messages: [
-            { type: 'user', text: '[分享了位置]', time: '12:30', location: true },
-            { type: 'bot', text: '正在查找您附近的空氣品質監測站...', time: '12:30', delay: 1500 },
-            { type: 'bot', content: 'flex', title: '📍 附近監測站', 
-              preview: '1. 台北車站 (0.8km)\\n   AQI: 62 (普通)\\n\\n2. 中山站 (1.2km)\\n   AQI: 58 (普通)\\n\\n3. 西門站 (1.5km)\\n   AQI: 65 (普通)', 
-              time: '12:31', delay: 3000 }
+            { type: 'user', text: '[已分享位置]', time: '12:30', location: true },
+            { type: 'bot', text: '正在分析您的位置，查找附近的空氣品質監測站...', time: '12:30', delay: 1500 },
+            { 
+                type: 'bot', 
+                content: 'flex', 
+                title: '📍 附近監測站查詢結果', 
+                preview: '找到 3 個附近監測站：\\n\\n1. 台北車站監測站 (0.8km)\\n   💨 AQI: 62 (普通)\\n\\n2. 中山站監測站 (1.2km)\\n   💨 AQI: 58 (普通)\\n\\n3. 西門站監測站 (1.5km)\\n   💨 AQI: 65 (普通)\\n\\n🎯 建議選擇中山站附近區域活動', 
+                time: '12:31', 
+                delay: 3000 
+            }
         ]
     },
-    ai: {
-        title: '🤖 AI智慧對話',
+    smart: {
+        title: '🤖 智慧問答對話',
         description: '自然語言理解，支援多種靈活的查詢方式',
         messages: [
             { type: 'user', text: '今天適合出門嗎？我在台北', time: '08:30' },
-            { type: 'bot', text: '讓我查一下台北今天的空氣品質...', time: '08:30', delay: 1000 },
-            { type: 'bot', text: '台北今天AQI為65（普通等級）\\n\\n😊 適合出門！建議：\\n• 🚶‍♂️ 適合散步、輕度運動\\n• 😷 建議配戴一般口罩\\n• ⚠️ 敏感族群注意防護', time: '08:31', delay: 2500 },
-            { type: 'user', text: '謝謝！', time: '08:32' },
-            { type: 'bot', text: '不客氣！😊 隨時為您監測空氣品質。\\n如需其他城市資訊或想訂閱提醒，都可以告訴我喔～', time: '08:32', delay: 800 }
+            { type: 'bot', text: '讓我為您查詢台北今天的空氣品質狀況...', time: '08:30', delay: 1000 },
+            { 
+                type: 'bot', 
+                text: '根據台北今天的空氣品質分析：\\n\\n💨 AQI: 65 (普通等級)\\n\\n😊 適合出門！建議：\\n• 🚶‍♂️ 適合散步、輕度運動\\n• 😷 建議配戴一般口罩\\n• ⚠️ 敏感族群注意防護\\n• 🌤️ 避免長時間戶外劇烈運動\\n\\n總體來說是個不錯的外出天氣！', 
+                time: '08:31', 
+                delay: 2500 
+            },
+            { type: 'user', text: '謝謝！那附近有推薦的公園嗎？', time: '08:32' },
+            { 
+                type: 'bot', 
+                text: '很高興為您服務！😊\\n\\n關於公園推薦，我建議您：\\n• 選擇樹木較多的公園（天然空氣淨化）\\n• 避開主要道路旁的公園\\n• 早晨或傍晚空氣品質通常較佳\\n\\n如需更多健康建議，隨時可以問我喔～', 
+                time: '08:32', 
+                delay: 1200 
+            }
+        ]
+    },
+    alert: {
+        title: '🚨 即時警報通知',
+        description: '空氣品質惡化時自動推送警報訊息',
+        messages: [
+            { 
+                type: 'bot', 
+                content: 'alert',
+                title: '🚨 空氣品質警報', 
+                preview: '⚠️ 緊急通知\\n\\n📍 台中市\\n💨 AQI: 165 (不健康)\\n\\n🚨 請立即採取防護措施：\\n• 避免戶外活動\\n• 關閉門窗\\n• 使用空氣清淨機\\n• 外出務必配戴 N95 口罩', 
+                time: '14:15', 
+                delay: 1000
+            },
+            { type: 'user', text: '了解，謝謝提醒', time: '14:16' },
+            { 
+                type: 'bot', 
+                text: '不客氣！您的健康是我們最關心的事。💚\\n\\n我會持續監控空氣品質變化，一旦改善會立即通知您。\\n\\n💡 小提醒：室內也要注意空氣循環喔！', 
+                time: '14:16', 
+                delay: 800 
+            }
         ]
     }
 };
@@ -456,28 +825,53 @@ const demos = {
 let currentDemo = 'query';
 let messageIndex = 0;
 let isPlaying = false;
+let autoCycleTimer = null;
 
+// 顯示指定的演示
 function showDemo(demoKey) {
     if (isPlaying) return;
     
     currentDemo = demoKey;
     messageIndex = 0;
     
-    // Update tab styles
+    // 更新標籤樣式
     document.querySelectorAll('.demo-tab').forEach(tab => {
         tab.classList.remove('active');
     });
-    event?.target?.classList.add('active') || 
-    document.querySelector(`[onclick="showDemo('${demoKey}')"]`).classList.add('active');
     
-    // Clear messages
+    // 找到對應的標籤並設為活躍
+    const targetTab = Array.from(document.querySelectorAll('.demo-tab')).find(tab => 
+        tab.textContent.includes(getDemoEmoji(demoKey))
+    );
+    if (targetTab) {
+        targetTab.classList.add('active');
+    }
+    
+    // 清空訊息容器
     const messagesContainer = document.getElementById('chatMessages');
     messagesContainer.innerHTML = '';
     
-    // Start playing messages
+    // 開始播放演示
     playDemo();
+    
+    // 重置自動循環
+    resetAutoCycle();
 }
 
+// 獲取演示對應的 emoji
+function getDemoEmoji(demoKey) {
+    const emojiMap = {
+        query: '🔍',
+        compare: '📊', 
+        health: '💊',
+        location: '📍',
+        smart: '🤖',
+        alert: '🚨'
+    };
+    return emojiMap[demoKey] || '🔍';
+}
+
+// 播放演示對話
 function playDemo() {
     if (isPlaying) return;
     isPlaying = true;
@@ -495,7 +889,7 @@ function playDemo() {
         const message = demo.messages[messageIndex];
         const delay = message.delay || 0;
         
-        // Show typing indicator for bot messages
+        // 顯示打字指示器（針對機器人訊息且有延遲）
         if (message.type === 'bot' && delay > 500) {
             typingIndicator.style.display = 'block';
             setTimeout(() => {
@@ -516,6 +910,7 @@ function playDemo() {
     showNextMessage();
 }
 
+// 添加訊息到聊天窗口
 function addMessage(message) {
     const messagesContainer = document.getElementById('chatMessages');
     const messageDiv = document.createElement('div');
@@ -528,7 +923,19 @@ function addMessage(message) {
             <div class="message-bubble">
                 <div class="flex-message-preview">
                     <strong>${message.title}</strong><br>
-                    <div style="margin-top: 0.5rem; font-size: 0.75rem;">
+                    <div style="margin-top: 0.8rem; font-size: 0.85rem; text-align: left;">
+                        ${message.preview.replace(/\\n/g, '<br>')}
+                    </div>
+                </div>
+            </div>
+            <div class="message-time">${message.time}</div>
+        `;
+    } else if (message.content === 'alert') {
+        messageContent = `
+            <div class="message-bubble" style="border-color: #ff0000; background: linear-gradient(45deg, rgba(255, 0, 0, 0.1), rgba(255, 69, 0, 0.1));">
+                <div class="flex-message-preview" style="border-color: #ff0000; background: rgba(255, 0, 0, 0.1);">
+                    <strong style="color: #d32f2f;">${message.title}</strong><br>
+                    <div style="margin-top: 0.8rem; font-size: 0.85rem; text-align: left; color: #d32f2f;">
                         ${message.preview.replace(/\\n/g, '<br>')}
                     </div>
                 </div>
@@ -538,10 +945,12 @@ function addMessage(message) {
     } else if (message.location) {
         messageContent = `
             <div class="message-bubble">
-                📍 位置資訊
-                <div style="margin-top: 0.5rem; padding: 0.5rem; background: rgba(0,0,0,0.1); border-radius: 8px; font-size: 0.8rem;">
-                    🗺️ 台北市中正區<br>
-                    📌 25.0478°N, 121.5319°E
+                <div class="location-message">
+                    <strong>📍 位置資訊</strong><br>
+                    <div style="margin-top: 0.5rem; font-size: 0.85rem;">
+                        🗺️ 台北市中正區<br>
+                        📌 25.0478°N, 121.5319°E
+                    </div>
                 </div>
             </div>
             <div class="message-time">${message.time}</div>
@@ -558,34 +967,109 @@ function addMessage(message) {
     messagesContainer.scrollTop = messagesContainer.scrollHeight;
 }
 
-// Initialize with first demo
-document.addEventListener('DOMContentLoaded', function() {
-    setTimeout(() => showDemo('query'), 1000);
-});
-
-// Auto-cycle demos every 15 seconds when not manually controlled
-let autoCycleTimer;
+// 自動循環演示
 function startAutoCycle() {
     const demoKeys = Object.keys(demos);
-    let currentIndex = 0;
+    let currentIndex = demoKeys.indexOf(currentDemo);
     
     autoCycleTimer = setInterval(() => {
         if (!isPlaying) {
             currentIndex = (currentIndex + 1) % demoKeys.length;
             showDemo(demoKeys[currentIndex]);
         }
-    }, 15000);
+    }, 12000); // 每12秒切換
 }
 
-// Start auto-cycle after initial load
-setTimeout(startAutoCycle, 10000);
-
-// Pause auto-cycle when user interacts
-document.querySelectorAll('.demo-tab, .feature').forEach(element => {
-    element.addEventListener('click', () => {
+// 重置自動循環
+function resetAutoCycle() {
+    if (autoCycleTimer) {
         clearInterval(autoCycleTimer);
-        setTimeout(startAutoCycle, 30000); // Restart after 30 seconds
+    }
+    setTimeout(startAutoCycle, 20000); // 20秒後重新開始自動循環
+}
+
+// 頁面載入完成後的初始化
+document.addEventListener('DOMContentLoaded', function() {
+    // 添加載入動畫
+    setTimeout(() => {
+        document.querySelectorAll('.loading').forEach(element => {
+            element.style.animationDelay = '0.2s';
+        });
+    }, 100);
+    
+    // 1秒後開始第一個演示
+    setTimeout(() => {
+        showDemo('query');
+    }, 1500);
+    
+    // 5秒後開始自動循環
+    setTimeout(startAutoCycle, 8000);
+});
+
+// 為功能卡片和標籤添加點擊事件
+document.addEventListener('click', function(event) {
+    if (event.target.closest('.feature') || event.target.closest('.demo-tab')) {
+        resetAutoCycle();
+    }
+});
+
+// 添加滾動效果
+window.addEventListener('scroll', function() {
+    const elements = document.querySelectorAll('.loading');
+    elements.forEach(element => {
+        const elementTop = element.getBoundingClientRect().top;
+        const elementVisible = 150;
+        
+        if (elementTop < window.innerHeight - elementVisible) {
+            element.style.opacity = '1';
+            element.style.transform = 'translateY(0)';
+        }
     });
+});
+
+// 性能優化：防抖處理
+function debounce(func, wait) {
+    let timeout;
+    return function executedFunction(...args) {
+        const later = () => {
+            clearTimeout(timeout);
+            func(...args);
+        };
+        clearTimeout(timeout);
+        timeout = setTimeout(later, wait);
+    };
+}
+
+// 添加鍵盤快捷鍵支持
+document.addEventListener('keydown', function(event) {
+    if (event.ctrlKey || event.metaKey) {
+        switch(event.key) {
+            case '1':
+                event.preventDefault();
+                showDemo('query');
+                break;
+            case '2':
+                event.preventDefault();
+                showDemo('compare');
+                break;
+            case '3':
+                event.preventDefault();
+                showDemo('health');
+                break;
+            case '4':
+                event.preventDefault();
+                showDemo('location');
+                break;
+            case '5':
+                event.preventDefault();
+                showDemo('smart');
+                break;
+            case '6':
+                event.preventDefault();
+                showDemo('alert');
+                break;
+        }
+    }
 });
 </script>
 </body>
