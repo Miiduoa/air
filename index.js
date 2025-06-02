@@ -1,6 +1,19 @@
 /**
- * 智慧空氣品質機器人 (修復版)
- * 版本：2.1.0-complete-fix
+ * 智慧空氣品質機器人 + AI 自然對話 (修復版 v3.0)
+ * 版本：3.0.0
+ *
+ * 功能：
+ * 1. 空氣品質查詢 / 多城市比較 / 訂閱提醒 / 緊急警報
+ * 2. 定時推送每日報告 & 檢查緊急警報
+ * 3. 附近測站查詢 (GPS)
+ * 4. AI 自然對話：使用者可以直接用聊天方式與機器人互動 (由 OpenAI GPT-4 驅動)
+ * 5. 網頁首頁 / 健康檢查 / Debug / API 端點
+ *
+ * 環境變數：
+ * - LINE_CHANNEL_ACCESS_TOKEN
+ * - LINE_CHANNEL_SECRET
+ * - OPENAI_API_KEY
+ * - PORT (選填，預設 3000)
  */
 
 const express = require('express');
@@ -9,14 +22,15 @@ const axios = require('axios');
 const cron = require('node-cron');
 const path = require('path');
 const fs = require('fs');
+const { Configuration, OpenAIApi } = require('openai');
 
 const app = express();
 
-// 允許解析 JSON 與 URL-encoded（為了確保 Webhook 能正常解析）
+// 解析 JSON 與 URL-encoded
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// 靜態文件服務（ /public 目錄 ）
+// 靜態文件服務 (public 資料夾)
 app.use(express.static('public'));
 
 // ===== LINE Bot 設定 =====
@@ -24,24 +38,24 @@ const config = {
   channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN,
   channelSecret: process.env.LINE_CHANNEL_SECRET,
 };
-
-// 建立 LINE 客戶端
 const client = new line.Client(config);
+
+// ===== OpenAI GPT-4 設定 =====
+const openaiConfig = new Configuration({
+  apiKey: process.env.OPENAI_API_KEY,
+});
+const openai = new OpenAIApi(openaiConfig);
 
 // ===== 空氣品質 API (WAQI) =====
 const WAQI_TOKEN = 'b144682944ddd13da46203e66fed4fd6be745619';
 const WAQI_BASE_URL = 'https://api.waqi.info';
 
-// ===== 訂閱管理 =====
-// 為了簡化 demo，先用 Map 暫存：
-// subscriptions： userId => { cities: [], settings: { dailyReport, emergencyAlert, threshold } }
-// locationCache： userId => { lat, lng, timestamp }
-// userStates： userId => { state, context, timestamp }
-let subscriptions = new Map();
-let locationCache = new Map();
-let userStates = new Map();
+// ===== 資料暫存 (示範用，建議實務用資料庫) =====
+let subscriptions = new Map();      // userId -> { cities: [], settings: { dailyReport, emergencyAlert, threshold } }
+let locationCache = new Map();      // userId -> { lat, lng, timestamp }
+let userStates = new Map();         // userId -> { state, context, timestamp }
 
-// 城市對應表：中文 => API 英文 key
+// 城市對應表：中文 => WAQI API 英文 key
 const cityMap = {
   '台北': 'taipei',
   '台中': 'taichung',
@@ -73,7 +87,7 @@ const cityMap = {
   '澳門': 'macau'
 };
 
-// ==== 用戶狀態管理 (5 分鐘超時) ====
+// ===== 用戶狀態管理 (5 分鐘超時) =====
 function setUserState(userId, state, context = {}) {
   userStates.set(userId, { state, context, timestamp: Date.now() });
   console.log(`設定用戶狀態: ${userId} -> ${state}`);
@@ -93,9 +107,9 @@ function clearUserState(userId) {
   console.log(`清除用戶狀態: ${userId}`);
 }
 
-// ==== 基礎函式：地理距離、找到附近測站 ====
+// ===== 計算兩點距離 (公里) =====
 function calculateDistance(lat1, lon1, lat2, lon2) {
-  const R = 6371; // 地球半徑 (公里)
+  const R = 6371;
   const dLat = ((lat2 - lat1) * Math.PI) / 180;
   const dLon = ((lon2 - lon1) * Math.PI) / 180;
   const a =
@@ -108,6 +122,7 @@ function calculateDistance(lat1, lon1, lat2, lon2) {
   return R * c;
 }
 
+// ===== 根據位置查找附近測站 =====
 async function findNearbyStations(lat, lng) {
   try {
     const url = `${WAQI_BASE_URL}/search/?token=${WAQI_TOKEN}&keyword=geo:${lat};${lng}`;
@@ -130,7 +145,7 @@ async function findNearbyStations(lat, lng) {
   }
 }
 
-// ==== 訂閱操作函式 ====
+// ===== 訂閱管理函式 =====
 function addSubscription(userId, city) {
   if (!subscriptions.has(userId)) {
     subscriptions.set(userId, {
@@ -203,7 +218,7 @@ function updateUserSettings(userId, settings) {
   return userSub.settings;
 }
 
-// ==== 定時任務：每日報告 & 緊急警報檢查 ====
+// ===== 定時任務：每日報告 & 緊急警報檢查 =====
 // 每天 08:00 推送每日報告
 cron.schedule(
   '0 8 * * *',
@@ -212,10 +227,9 @@ cron.schedule(
     for (const [userId, subscription] of subscriptions.entries()) {
       if (subscription.settings.dailyReport && subscription.cities.length > 0) {
         try {
-          // 構造 cities 參數 (這裡把同一字串當中英文皆用)
-          const cityInfos = subscription.cities.map((cityEnglish) => ({
-            chinese: Object.keys(cityMap).find((k) => cityMap[k] === cityEnglish) || cityEnglish,
-            english: cityEnglish
+          const cityInfos = subscription.cities.map((cityEng) => ({
+            chinese: Object.keys(cityMap).find((k) => cityMap[k] === cityEng) || cityEng,
+            english: cityEng
           }));
           const cityData = await getMultipleCitiesAirQuality(cityInfos);
           if (cityData.length > 0) {
@@ -239,8 +253,8 @@ cron.schedule(
     for (const [userId, subscription] of subscriptions.entries()) {
       if (subscription.settings.emergencyAlert && subscription.cities.length > 0) {
         try {
-          for (const cityEnglish of subscription.cities) {
-            const data = await getAirQuality(cityEnglish);
+          for (const cityEng of subscription.cities) {
+            const data = await getAirQuality(cityEng);
             if (data.aqi > subscription.settings.threshold) {
               const alertMsg = createEmergencyAlertFlexMessage(data);
               await client.pushMessage(userId, alertMsg);
@@ -255,7 +269,7 @@ cron.schedule(
   { timezone: 'Asia/Taipei' }
 );
 
-// ==== AQI 級別 & 健康建議 系統 ====
+// ===== AQI 級別 & 健康建議 =====
 function getAQILevel(aqi) {
   if (aqi <= 50) return { level: '良好', color: '#00e400', emoji: '😊' };
   if (aqi <= 100) return { level: '普通', color: '#ffff00', emoji: '😐' };
@@ -323,13 +337,13 @@ function getHealthAdvice(aqi) {
   }
 }
 
-// ==== 自然語言解析：查詢指令 ====
+// ===== 自然語言解析：查詢指令 =====
 function parseQuery(text) {
   console.log(`解析查詢: "${text}"`);
   const cleanText = text.toLowerCase().trim();
   const originalText = text.trim();
 
-  // 如果包含這些關鍵字，就讓主邏輯處理（避免誤把設定、訂閱當城市名）
+  // 如果包含這些關鍵字，就先交給主邏輯處理（避免誤把設定、訂閱當城市名）
   const functionalKeywords = ['設定', 'settings', '主選單', 'menu', '幫助', 'help', '訂閱', 'subscribe'];
   for (const kw of functionalKeywords) {
     if (originalText.includes(kw)) {
@@ -412,7 +426,7 @@ function parseCompareQuery(text) {
   return null;
 }
 
-// ==== 取得單一城市 AQI ====
+// ===== 取得單一城市 AQI =====
 async function getAirQuality(cityEnglish) {
   try {
     const url = `${WAQI_BASE_URL}/feed/${cityEnglish}/?token=${WAQI_TOKEN}`;
@@ -429,7 +443,7 @@ async function getAirQuality(cityEnglish) {
   }
 }
 
-// ==== 取得多城市 AQI ====
+// ===== 取得多城市 AQI =====
 async function getMultipleCitiesAirQuality(cities) {
   const results = [];
   for (const cityInfo of cities) {
@@ -444,13 +458,31 @@ async function getMultipleCitiesAirQuality(cities) {
       }
     } catch (err) {
       console.error(`獲取 ${cityInfo.chinese} 資料失敗:`, err);
-      // 失敗就跳過，不中斷整個流程
+      // 失敗就跳過，不中斷
     }
   }
   return results;
 }
 
-// ==== Flex Message 範本 ====
+// ===== AI 模型呼叫 (OpenAI GPT-4) =====
+async function callOpenAI(promptText) {
+  try {
+    const completion = await openai.createChatCompletion({
+      model: 'gpt-4',
+      messages: [
+        { role: 'system', content: '你是一個貼心的台灣地區空氣品質機器人，能提供空氣品質資訊並與使用者自然對話。' },
+        { role: 'user', content: promptText }
+      ]
+    });
+    const reply = completion.data.choices[0].message.content.trim();
+    return reply;
+  } catch (err) {
+    console.error('OpenAI 呼叫失敗:', err);
+    return '抱歉，AI 回覆時發生錯誤，請稍後再試。';
+  }
+}
+
+// ===== Flex Message 範本函式 =====
 
 // 1. 主選單
 function createMainMenuFlexMessage() {
@@ -820,7 +852,6 @@ function createSubscriptionManagementFlexMessage(userId) {
     }
   };
 
-  // 如果有訂閱就顯示列表、設定
   if (hasSubscriptions) {
     flexMsg.contents.body.contents.push({
       type: 'text',
@@ -859,7 +890,6 @@ function createSubscriptionManagementFlexMessage(userId) {
       });
     });
 
-    // 顯示目前設定
     flexMsg.contents.body.contents.push(
       { type: 'separator', margin: 'lg' },
       {
@@ -892,7 +922,6 @@ function createSubscriptionManagementFlexMessage(userId) {
       }
     );
   } else {
-    // 沒訂閱顯示提示
     flexMsg.contents.body.contents.push({
       type: 'text',
       text: '您目前沒有訂閱任何城市',
@@ -902,7 +931,6 @@ function createSubscriptionManagementFlexMessage(userId) {
     });
   }
 
-  // 新增操作按鈕 (新增訂閱、修改設定)
   flexMsg.contents.body.contents.push(
     { type: 'separator', margin: 'lg' },
     {
@@ -934,10 +962,8 @@ function createSubscriptionManagementFlexMessage(userId) {
     }
   );
 
-  // 如果有訂閱，再加一個「清除所有訂閱」按鈕
   if (hasSubscriptions) {
     const lastBoxIndex = flexMsg.contents.body.contents.length - 1;
-    // lastBox = 這個 box
     flexMsg.contents.body.contents[lastBoxIndex].contents.push({
       type: 'button',
       style: 'secondary',
@@ -955,7 +981,6 @@ function createSubscriptionManagementFlexMessage(userId) {
 // 4. 個人設定
 function createSettingsFlexMessage(userId) {
   const userSub = getUserSubscriptions(userId);
-
   return {
     type: 'flex',
     altText: '個人設定 - 智慧空氣品質機器人',
@@ -1229,7 +1254,6 @@ function createSimpleConfirmMessage(title, message, isSuccess = true, showReturn
 
 // 6. 每日報告 Flex
 function createDailyReportFlexMessage(citiesData) {
-  // 按 AQI 排序，最小為最佳城市
   const bestCity = citiesData.reduce((best, cur) => (cur.aqi < best.aqi ? cur : best), citiesData[0]);
   return {
     type: 'flex',
@@ -1257,8 +1281,8 @@ function createDailyReportFlexMessage(citiesData) {
             margin: 'sm'
           }
         ],
-        paddingAll: '20px',
-        backgroundColor: '#4CAF50'
+        backgroundColor: '#4CAF50',
+        paddingAll: '20px'
       },
       body: {
         type: 'box',
@@ -1893,7 +1917,6 @@ function createAirQualityFlexMessage(data) {
     }
   };
 
-  // 如果有 iaqi，就把詳細污染物也列出來
   if (data.iaqi) {
     const pollutants = [
       { key: 'pm25', name: 'PM2.5', unit: 'μg/m³' },
@@ -2151,7 +2174,7 @@ function createWelcomeFlexMessage() {
           },
           {
             type: 'text',
-            text: '🔍 即時空氣品質查詢\n📊 多城市比較分析\n💊 專業健康建議\n🔔 智慧訂閱提醒\n📍 GPS定位查詢',
+            text: '🔍 即時空氣品質查詢\n📊 多城市比較分析\n💊 專業健康建議\n🔔 智慧訂閱提醒\n📍 GPS定位查詢\n🤖 AI 自然對話',
             size: 'sm',
             color: '#666666',
             margin: 'sm',
@@ -2281,7 +2304,7 @@ function createHelpFlexMessage() {
               },
               {
                 type: 'text',
-                text: '• 每日08:00空氣品質報告\n• 空氣品質惡化警報\n• 個人化健康建議',
+                text: '• 每日08:00 空氣品質報告\n• 空氣品質惡化警報\n• 個人化健康建議',
                 size: 'sm',
                 color: '#666666',
                 wrap: true
@@ -2334,7 +2357,7 @@ function createHelpFlexMessage() {
               },
               {
                 type: 'text',
-                text: '• 6級AQI健康分級\n• 運動建議\n• 口罩配戴建議\n• 室內空氣管理',
+                text: '• 6 級 AQI 健康分級\n• 運動建議\n• 口罩配戴建議\n• 室內空氣管理',
                 size: 'sm',
                 color: '#666666',
                 wrap: true
@@ -2351,6 +2374,59 @@ function createHelpFlexMessage() {
                 text: '• 一般民眾\n• 敏感族群\n• 孕婦及兒童\n• 老年人',
                 size: 'sm',
                 color: '#666666',
+                wrap: true
+              }
+            ]
+          }
+        },
+        {
+          type: 'bubble',
+          header: {
+            type: 'box',
+            layout: 'vertical',
+            contents: [
+              {
+                type: 'text',
+                text: '🤖 AI 自然對話',
+                weight: 'bold',
+                color: '#ffffff',
+                size: 'lg',
+                align: 'center'
+              }
+            ],
+            backgroundColor: '#2196F3',
+            paddingAll: '20px'
+          },
+          body: {
+            type: 'box',
+            layout: 'vertical',
+            spacing: 'md',
+            contents: [
+              {
+                type: 'text',
+                text: '💬 使用方式',
+                weight: 'bold',
+                color: '#333333'
+              },
+              {
+                type: 'text',
+                text: '• 在任何時候，直接對我說話\n• 我會用最貼心的方式回應您\n• 也能回答空氣品質之外的一般問題',
+                size: 'sm',
+                color: '#666666',
+                wrap: true
+              },
+              {
+                type: 'text',
+                text: '📝 範例',
+                weight: 'bold',
+                color: '#333333',
+                margin: 'lg'
+              },
+              {
+                type: 'text',
+                text: '「最近空氣品質怎麼樣？」\n「幫我推薦一部好看的電影」\n「台北 AQI 是多少？」',
+                size: 'sm',
+                color: '#2196F3',
                 wrap: true
               }
             ]
@@ -2457,10 +2533,11 @@ function createErrorFlexMessage(errorType, message) {
   };
 }
 
-// ==== 主要事件處理函式 ====
+// ===== 主要事件處理函式 =====
 async function handleEvent(event) {
   console.log('收到事件:', event.type, event.message?.type || 'non-message');
 
+  // 只處理文字 & 位置訊息
   if (event.type !== 'message') {
     return Promise.resolve(null);
   }
@@ -2497,7 +2574,7 @@ async function handleEvent(event) {
       return handleStatefulMessage(event, userState);
     }
 
-    // 3) 處理各種「關鍵字命令」優先
+    // 3) 處理「關鍵字命令」優先
     // 3.1) 問候 / 主選單
     if (userMessage.match(/^(你好|哈囉|hello|hi|主選單|menu|開始|start)/i)) {
       const welcomeMsg = createWelcomeFlexMessage();
@@ -2551,7 +2628,7 @@ async function handleEvent(event) {
       updateUserSettings(userId, { emergencyAlert: false });
       const confirm = createSimpleConfirmMessage(
         '✅ 緊急警報已關閉',
-        '我們已停止推送緊急警報通知。\n\n您可以隨時在設定中重新開啟此功能。',
+        '我們已停止推送緊急警報通知。\n\n您可以隨時在設定中重新啟用此功能。',
         true
       );
       return client.replyMessage(event.replyToken, confirm);
@@ -2798,7 +2875,7 @@ async function handleEvent(event) {
       return client.replyMessage(event.replyToken, confirm);
     }
 
-    // 4) 如果沒有符合上述功能，就做「自然語言解析」
+    // 4) 如果以上都不是，就做「自然語言解析」
     const queryResult = parseQuery(userMessage);
     console.log('查詢解析結果:', queryResult);
 
@@ -2820,7 +2897,6 @@ async function handleEvent(event) {
         );
         return client.replyMessage(event.replyToken, confirm);
       } else {
-        // 沒辨識到城市，就進入輸入城市狀態
         setUserState(userId, 'awaiting_subscribe_city');
         const citySelectionMsg = createCitySelectionFlexMessage();
         return client.replyMessage(event.replyToken, citySelectionMsg);
@@ -2843,7 +2919,6 @@ async function handleEvent(event) {
         );
         return client.replyMessage(event.replyToken, confirm);
       } else {
-        // 沒有指定城市時，就顯示「訂閱管理」
         const userSub = getUserSubscriptions(userId);
         if (userSub.cities.length === 0) {
           const noSub = createSimpleConfirmMessage(
@@ -2864,7 +2939,7 @@ async function handleEvent(event) {
       return client.replyMessage(event.replyToken, subMgmt);
     }
 
-    // 4.4) 多城市比較 (直接在文字裡面比較)
+    // 4.4) 多城市比較 (文字裡面直接比較)
     if (queryResult && queryResult.type === 'compare') {
       console.log('開始比較城市:', queryResult.cities);
       const citiesData = await getMultipleCitiesAirQuality(queryResult.cities);
@@ -2876,7 +2951,6 @@ async function handleEvent(event) {
         return client.replyMessage(event.replyToken, errMsg);
       }
       if (citiesData.length === 1) {
-        // 只有一個能取到，就回傳單一城市
         const flexMsg = createAirQualityFlexMessage(citiesData[0]);
         return client.replyMessage(event.replyToken, flexMsg);
       }
@@ -2892,7 +2966,7 @@ async function handleEvent(event) {
       return client.replyMessage(event.replyToken, flexMsg);
     }
 
-    // 5) 預設的「自訂城市比較」指令
+    // 4.6) 自訂「城市比較」指令
     if (userMessage.includes('自訂城市比較') || userMessage.includes('自定義比較')) {
       setUserState(userId, 'awaiting_compare_cities');
       const instr = {
@@ -2976,28 +3050,15 @@ async function handleEvent(event) {
       return client.replyMessage(event.replyToken, instr);
     }
 
-    // 6) 如果以上都沒匹配，就給出「找不到指令」提示 + 主選單
-    console.log('無法識別的指令:', userMessage);
-    const suggestions = [];
-    if (userMessage.length < 3) {
-      suggestions.push('💡 輸入完整的城市名稱，如「台北」、「東京」');
-    } else {
-      const possibleCities = Object.keys(cityMap).filter(
-        (city) => city.includes(userMessage) || userMessage.includes(city)
-      );
-      if (possibleCities.length > 0) {
-        suggestions.push(`💡 您是否想查詢：${possibleCities.slice(0, 3).join('、')}`);
-      } else {
-        suggestions.push('💡 支援城市：台北、高雄、東京、首爾、新加坡等');
-      }
-    }
+    // 5) 最後：如果以上都沒匹配，就進行「AI 自然對話」
+    console.log('進入 AI 自然對話流程');
 
-    const notFoundMsg = createErrorFlexMessage(
-      'not_found',
-      `我無法識別「${userMessage}」這個指令。\n\n${suggestions.join('\n')}\n\n請使用下方選單或參考使用說明。`
-    );
-    const mainMenuMsg = createMainMenuFlexMessage();
-    return client.replyMessage(event.replyToken, [notFoundMsg, mainMenuMsg]);
+    // 呼叫 OpenAI，讓 GPT-4 回覆
+    const aiReply = await callOpenAI(userMessage);
+    return client.replyMessage(event.replyToken, {
+      type: 'text',
+      text: aiReply
+    });
   } catch (error) {
     console.error('處理訊息錯誤:', error);
     let errMsg;
@@ -3011,7 +3072,7 @@ async function handleEvent(event) {
     } else {
       errMsg = createErrorFlexMessage(
         'api_error',
-        '查詢空氣品質時發生錯誤，我們的技術團隊已收到通知。\n\n請稍後再試或使用其他功能。'
+        '查詢空氣品質或 AI 回覆時發生錯誤，我們的技術團隊已收到通知。\n\n請稍後再試或使用其他功能。'
       );
     }
     const mainMenuMsg = createMainMenuFlexMessage();
@@ -3019,14 +3080,14 @@ async function handleEvent(event) {
   }
 }
 
-// ==== 有狀態的對話 (訂閱 & 比較) ====
+// ===== 處理有狀態的對話 (訂閱 & 比較) =====
 async function handleStatefulMessage(event, userState) {
   const userId = event.source.userId;
   const userMessage = event.message.text.trim();
   console.log(`處理有狀態訊息: ${userState.state}, 訊息: "${userMessage}"`);
 
   try {
-    // 1) 如果狀態是「awaiting_compare_cities」
+    // 1) 狀態：awaiting_compare_cities
     if (userState.state === 'awaiting_compare_cities') {
       const cities = [];
       const parts = userMessage.split(/[\s,，、]+/);
@@ -3080,7 +3141,7 @@ async function handleStatefulMessage(event, userState) {
       return client.replyMessage(event.replyToken, cmpMsg);
     }
 
-    // 2) 如果狀態是「awaiting_subscribe_city」
+    // 2) 狀態：awaiting_subscribe_city
     if (userState.state === 'awaiting_subscribe_city') {
       const queryResult = parseQuery(userMessage);
       clearUserState(userId);
@@ -3108,7 +3169,7 @@ async function handleStatefulMessage(event, userState) {
       }
     }
 
-    // 3) 其他狀態：直接取消，顯示主選單
+    // 3) 預設清除狀態並返回主選單
     clearUserState(userId);
     const cancelMsg = createSimpleConfirmMessage(
       '❓ 操作取消',
@@ -3130,7 +3191,7 @@ async function handleStatefulMessage(event, userState) {
   }
 }
 
-// ==== Webhook 端點 ====
+// ===== Webhook 端點 =====
 app.post('/webhook', line.middleware(config), (req, res) => {
   console.log('收到 Webhook 請求');
   Promise.all(req.body.events.map((evt) => handleEvent(evt)))
@@ -3144,21 +3205,20 @@ app.post('/webhook', line.middleware(config), (req, res) => {
     });
 });
 
-// ==== 首頁 (GET /) ====
+// ===== 首頁 (GET /) =====
 app.get('/', (req, res) => {
   try {
     const filePath = path.join(__dirname, 'index.html');
     if (fs.existsSync(filePath)) {
       return res.sendFile(filePath);
     } else {
-      // 如果 index.html 不存在，就回傳簡易 HTML (已修復功能清單 + Button)
       return res.send(`
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>智慧空氣品質機器人 (修復版) | LINE Bot</title>
+    <title>智慧空氣品質機器人 + AI 自然對話 (修復版) | LINE Bot</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -3308,12 +3368,12 @@ app.get('/', (req, res) => {
 <body>
     <div class="main-container">
         <div class="hero-section">
-            <h1>🌬️ 智慧空氣品質機器人</h1>
+            <h1>🌬️ 智慧空氣品質機器人 + AI 自然對話</h1>
             <div class="status-badge">
                 <div class="status-dot"></div>
-                <span><strong>修復版 v2.1</strong> - 服務正常運行中</span>
+                <span><strong>修復版 v3.0</strong> - 服務正常運行中</span>
             </div>
-            <p>即時監測空氣品質，提供專業健康建議，守護您和家人的每一次呼吸</p>
+            <p>即時監測空氣品質，提供專業健康建議，亦能 AI 對話回答各種問題</p>
             
             <div style="margin: 2rem 0;">
                 <a href="https://line.me/R/ti/p/@470kdmxx" class="cta-button" target="_blank">
@@ -3326,9 +3386,10 @@ app.get('/', (req, res) => {
             
             <div class="fix-highlight">
                 <h4>🔧 最新修復內容</h4>
-                <p>已修復所有按鈕回應問題，提升用戶體驗</p>
+                <p>整合 AI 自然對話 (OpenAI GPT-4)，讓使用者能用自然語言與機器人對話</p>
                 <div class="fix-list">
-                    <div class="fix-item">✅ 城市選擇按鈕修復</div>
+                    <div class="fix-item">✅ AI 自然對話功能</div>
+                    <div class="fix-item">✅ 查詢解析邏輯精度提升</div>
                     <div class="fix-item">✅ 設定功能回應修復</div>
                     <div class="fix-item">✅ 訂閱管理按鈕修復</div>
                     <div class="fix-item">✅ 查詢解析邏輯改善</div>
@@ -3365,8 +3426,8 @@ app.get('/', (req, res) => {
                 </div>
                 <div class="feature">
                     <i class="fas fa-robot"></i>
-                    <h4>AI 智慧</h4>
-                    <p>自然語言理解<br>智慧對話互動</p>
+                    <h4>AI 自然對話</h4>
+                    <p>隨時聊天提問<br>超越空氣品質問題</p>
                 </div>
             </div>
         </div>
@@ -3381,9 +3442,9 @@ app.get('/', (req, res) => {
             </div>
             
             <div style="margin-top: 2rem; padding-top: 1rem; border-top: 1px solid #eee; font-size: 0.85rem; color: #999;">
-                <p><strong>© 2025 智慧空氣品質機器人 (修復版 v2.1)</strong></p>
+                <p><strong>© 2025 智慧空氣品質機器人 + AI 自然對話 (修復版 v3.0)</strong></p>
                 <p>🌱 用科技守護每一次呼吸 | 🔒 隱私保護 | 📱 跨平台支援</p>
-                <p>💡 <em>讓 AI 成為您的專屬空氣品質顧問</em></p>
+                <p>💡 <em>讓 AI 成為您的專屬空氣品質顧問與聊天夥伴</em></p>
             </div>
         </div>
     </div>
@@ -3404,15 +3465,15 @@ app.get('/', (req, res) => {
   }
 });
 
-// ==== 健康檢查 (GET /health) ====
+// ===== 健康檢查 (GET /health) =====
 app.get('/health', (req, res) => {
   const indexExists = fs.existsSync(path.join(__dirname, 'index.html'));
   res.json({
     status: 'OK',
-    message: 'LINE 空氣品質機器人正常運行中！(修復版 v2.1)',
+    message: 'LINE 空氣品質機器人 + AI 自然對話 正常運行中！(修復版 v3.0)',
     timestamp: new Date().toISOString(),
     uptime: Math.floor(process.uptime()),
-    version: '2.1.0-complete-fix',
+    version: '3.0.0-complete-fix',
     environment: {
       node_version: process.version,
       platform: process.platform,
@@ -3420,6 +3481,7 @@ app.get('/health', (req, res) => {
       index_html_exists: indexExists,
       line_token_configured: !!process.env.LINE_CHANNEL_ACCESS_TOKEN,
       line_secret_configured: !!process.env.LINE_CHANNEL_SECRET,
+      openai_api_configured: !!process.env.OPENAI_API_KEY,
       working_directory: __dirname,
       supported_cities: Object.keys(cityMap).length
     },
@@ -3430,10 +3492,10 @@ app.get('/health', (req, res) => {
       '訂閱提醒功能',
       'GPS定位查詢',
       'Flex圖文選單介面',
+      'AI 自然對話 (GPT-4)',
       '用戶狀態管理',
       '自然語言處理',
-      '錯誤處理機制',
-      '個人化設定'
+      '錯誤處理機制'
     ],
     statistics: {
       total_subscriptions: subscriptions.size,
@@ -3446,28 +3508,28 @@ app.get('/health', (req, res) => {
       }
     },
     fixes_applied: [
-      '🔧 修復查詢解析邏輯精度',
-      '🔧 修復設定按鈕回應機制',
-      '🔧 修復訂閱管理功能完整性',
-      '🔧 修復城市選擇按鈕動作',
-      '🔧 修復用戶狀態管理流程',
-      '🔧 新增智慧確認訊息系統',
-      '🔧 改善錯誤處理和用戶提示',
-      '🔧 修復 Flex Message 按鈕狀態',
-      '🔧 強化自然語言理解能力',
-      '🔧 完善訂閱流程用戶體驗'
+      '🔧 AI 自然對話 (OpenAI GPT-4) 整合',
+      '🔧 查詢解析邏輯精度提升',
+      '🔧 設定按鈕回應機制修復',
+      '🔧 訂閱管理功能完整性修復',
+      '🔧 城市選擇按鈕動作修復',
+      '🔧 用戶狀態管理流程修復',
+      '🔧 智慧確認訊息系統新增',
+      '🔧 錯誤處理和用戶提示改善',
+      '🔧 Flex Message 按鈕狀態修復',
+      '🔧 多城市比較演算法完善'
     ],
     recent_improvements: [
-      '✨ 新增智慧城市名稱模糊匹配',
-      '✨ 改善用戶操作反饋機制',
-      '✨ 優化訂閱設定視覺化介面',
-      '✨ 強化 GPS 定位查詢準確性',
-      '✨ 完善多城市比較演算法'
+      '✨ AI 自然對話 (GPT-4) 支援',
+      '✨ 智慧城市名稱模糊匹配',
+      '✨ 用戶操作反饋機制優化',
+      '✨ 訂閱設定視覺化介面',
+      '✨ GPS 定位查詢準確性提升'
     ]
   });
 });
 
-// ==== API：單一城市空氣品質 (GET /api/air-quality/:city) ====
+// ===== API：單一城市空氣品質 (GET /api/air-quality/:city) =====
 app.get('/api/air-quality/:city', async (req, res) => {
   try {
     const cityEnglish = req.params.city;
@@ -3477,7 +3539,7 @@ app.get('/api/air-quality/:city', async (req, res) => {
       ...data,
       api_info: {
         request_time: new Date().toISOString(),
-        server_version: '2.1.0-complete-fix',
+        server_version: '3.0.0-complete-fix',
         data_source: 'World Air Quality Index API'
       }
     });
@@ -3493,12 +3555,12 @@ app.get('/api/air-quality/:city', async (req, res) => {
   }
 });
 
-// ==== API：服務統計 (GET /api/stats) ====
+// ===== API：服務統計 (GET /api/stats) =====
 app.get('/api/stats', (req, res) => {
   res.json({
     service: {
-      name: '智慧空氣品質機器人',
-      version: '2.1.0-complete-fix',
+      name: '智慧空氣品質機器人 + AI 自然對話',
+      version: '3.0.0-complete-fix',
       status: 'running',
       last_restart: new Date().toISOString()
     },
@@ -3517,10 +3579,10 @@ app.get('/api/stats', (req, res) => {
       'subscription_alerts_system',
       'gps_location_based_query',
       'flex_message_interface',
+      'ai_natural_conversation',
       'natural_language_processing',
       'user_state_management',
-      'smart_error_handling',
-      'personalized_settings'
+      'smart_error_handling'
     ],
     supported_regions: {
       taiwan: Object.entries(cityMap).filter(([, eng]) =>
@@ -3536,7 +3598,7 @@ app.get('/api/stats', (req, res) => {
   });
 });
 
-// ==== API：訂閱統計 (GET /api/subscriptions/stats) ====
+// ===== API：訂閱統計 (GET /api/subscriptions/stats) =====
 app.get('/api/subscriptions/stats', (req, res) => {
   const stats = {
     overview: {
@@ -3585,13 +3647,13 @@ app.get('/api/subscriptions/stats', (req, res) => {
   res.json(stats);
 });
 
-// ==== Debug 端點 (GET /debug) ====
+// ===== Debug 端點 (GET /debug) =====
 app.get('/debug', (req, res) => {
   try {
     res.json({
       server_status: 'running',
       timestamp: new Date().toISOString(),
-      version: '2.1.0-complete-fix',
+      version: '3.0.0-complete-fix',
       node_version: process.version,
       platform: process.platform,
       uptime: Math.floor(process.uptime()),
@@ -3601,7 +3663,7 @@ app.get('/debug', (req, res) => {
         NODE_ENV: process.env.NODE_ENV,
         line_token_length: process.env.LINE_CHANNEL_ACCESS_TOKEN?.length || 0,
         line_secret_length: process.env.LINE_CHANNEL_SECRET?.length || 0,
-        waqi_token_configured: !!WAQI_TOKEN
+        openai_api_configured: !!process.env.OPENAI_API_KEY
       },
       file_system: {
         current_directory: __dirname,
@@ -3630,12 +3692,13 @@ app.get('/debug', (req, res) => {
         gps_location_query: 'enabled',
         health_recommendations: 'enabled',
         flex_message_interface: 'enabled',
-        daily_reports: 'enabled',
-        emergency_alerts: 'enabled',
+        ai_natural_conversation: 'enabled',
         natural_language_processing: 'enabled',
-        user_state_management: 'enabled'
+        user_state_management: 'enabled',
+        smart_error_handling: 'enabled'
       },
       fixes_status: {
+        ai_conversation_integrated: 'fixed',
         query_parsing_logic: 'fixed',
         settings_button_response: 'fixed',
         subscription_management: 'fixed',
@@ -3663,7 +3726,7 @@ app.get('/debug', (req, res) => {
   }
 });
 
-// ==== 清理過期的用戶狀態＆位置快取 (每小時) ====
+// ===== 清理過期的用戶狀態 & 位置快取 (每小時) =====
 cron.schedule(
   '0 * * * *',
   () => {
@@ -3671,15 +3734,12 @@ cron.schedule(
     let cleanedStates = 0;
     let cleanedLocations = 0;
 
-    // 清理用戶狀態 (5 分鐘超時)
     for (const [uid, state] of userStates.entries()) {
       if (now - state.timestamp > 5 * 60 * 1000) {
         userStates.delete(uid);
         cleanedStates++;
       }
     }
-
-    // 清理位置快取 (1 小時超時)
     for (const [uid, loc] of locationCache.entries()) {
       if (now - loc.timestamp > 60 * 60 * 1000) {
         locationCache.delete(uid);
@@ -3693,7 +3753,7 @@ cron.schedule(
   { timezone: 'Asia/Taipei' }
 );
 
-// ==== 全局錯誤處理中間件 ====
+// ===== 全局錯誤處理中間件 =====
 app.use((err, req, res, next) => {
   console.error('伺服器錯誤:', err);
   res.status(500).json({
@@ -3705,7 +3765,7 @@ app.use((err, req, res, next) => {
   });
 });
 
-// ==== 404 處理 ====
+// ===== 404 處理 =====
 app.use((req, res) => {
   res.status(404).json({
     error: 'Not Found',
@@ -3725,7 +3785,7 @@ app.use((req, res) => {
   });
 });
 
-// ==== 優雅關機 ====
+// ===== 優雅關機 =====
 process.on('SIGTERM', () => {
   console.log('收到 SIGTERM 信號，正在優雅關機...');
   console.log(`最終統計 - 訂閱用戶: ${subscriptions.size}, 用戶狀態: ${userStates.size}, 位置快取: ${locationCache.size}`);
@@ -3737,41 +3797,42 @@ process.on('SIGINT', () => {
   process.exit(0);
 });
 
-// ==== 啟動伺服器 ====
+// ===== 啟動伺服器 =====
 const port = process.env.PORT || 3000;
 app.listen(port, '0.0.0.0', () => {
   console.log('='.repeat(80));
-  console.log(`🚀 LINE 智慧空氣品質機器人在端口 ${port} 上運行 (完整修復版 v2.1)`);
+  console.log(`🚀 LINE 智慧空氣品質機器人 + AI 自然對話 在端口 ${port} 上運行 (完整修復版 v3.0)`);
   console.log('='.repeat(80));
 
   console.log('✨ 修復完成清單：');
-  console.log('✅ 1. 查詢解析邏輯精度提升');
-  console.log('✅ 2. 設定按鈕回應機制修復');
-  console.log('✅ 3. 訂閱管理功能完整性修復');
-  console.log('✅ 4. 城市選擇按鈕動作修復');
-  console.log('✅ 5. 用戶狀態管理流程修復');
-  console.log('✅ 6. 智慧確認訊息系統新增');
-  console.log('✅ 7. 錯誤處理和用戶提示改善');
-  console.log('✅ 8. Flex Message 按鈕狀態修復');
-  console.log('✅ 9. 自然語言理解能力強化');
-  console.log('✅ 10. 訂閱流程用戶體驗完善');
+  console.log('✅ AI 自然對話功能 (OpenAI GPT-4) 整合');
+  console.log('✅ 查詢解析邏輯精度提升');
+  console.log('✅ 設定按鈕回應機制修復');
+  console.log('✅ 訂閱管理功能完整性修復');
+  console.log('✅ 城市選擇按鈕動作修復');
+  console.log('✅ 用戶狀態管理流程修復');
+  console.log('✅ 智慧確認訊息系統新增');
+  console.log('✅ 錯誤處理和用戶提示改善');
+  console.log('✅ Flex Message 按鈕狀態修復');
+  console.log('✅ 多城市比較演算法完善');
 
   console.log('\n🌟 新增功能：');
+  console.log('✨ AI 自然對話 (OpenAI GPT-4)');
   console.log('✨ 智慧城市名稱模糊匹配');
   console.log('✨ 用戶操作反饋機制優化');
   console.log('✨ 訂閱設定視覺化介面');
   console.log('✨ GPS 定位查詢準確性提升');
-  console.log('✨ 多城市比較演算法完善');
 
   console.log(`\n🌐 服務網址: http://0.0.0.0:${port}`);
 
-  if (!process.env.LINE_CHANNEL_ACCESS_TOKEN || !process.env.LINE_CHANNEL_SECRET) {
-    console.warn('\n⚠️ 警告：LINE Bot 環境變數未完整設定');
-    console.warn('請在 Render Dashboard 或環境中設定以下：');
+  if (!process.env.LINE_CHANNEL_ACCESS_TOKEN || !process.env.LINE_CHANNEL_SECRET || !process.env.OPENAI_API_KEY) {
+    console.warn('\n⚠️ 警告：環境變數未完整設定');
+    console.warn('請設定以下變數：');
     console.warn('- LINE_CHANNEL_ACCESS_TOKEN');
     console.warn('- LINE_CHANNEL_SECRET');
+    console.warn('- OPENAI_API_KEY');
   } else {
-    console.log('\n✅ LINE Bot 環境變數設定完成');
+    console.log('\n✅ 所有必要環境變數已配置');
   }
 
   console.log('\n📊 系統初始狀態：');
@@ -3780,8 +3841,6 @@ app.listen(port, '0.0.0.0', () => {
   console.log(`- 活躍用戶狀態: ${userStates.size}`);
   console.log(`- 位置快取項目: ${locationCache.size}`);
 
-  console.log('\n🎉 所有修復已完成，系統已完全啟動！');
-  console.log('📱 LINE Bot 現在可以正常接收和回應所有用戶訊息');
-  console.log('🔧 所有按鈕和設定功能都已修復並正常工作');
+  console.log('\n🎉 系統已完全啟動，準備好與您聊天與查詢空氣品質！');
   console.log('='.repeat(80));
 });
