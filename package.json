@@ -1,21 +1,26 @@
 {
-  "name": "smart-air-quality-line-bot",
-  "version": "2.0.0",
-  "description": "智慧空氣品質 LINE 機器人 - 提供即時空氣品質查詢、多城市比較、健康建議和 GPS 定位功能",
+  "name": "smart-air-quality-ai-line-bot",
+  "version": "3.0.0",
+  "description": "🤖 AI 增強版智慧空氣品質 LINE 機器人 - 支援自然語言對話、意圖識別、實體抽取和個人化回應",
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
     "dev": "nodemon index.js",
-    "test": "node test_script.js",
-    "test:local": "TEST_URL=http://localhost:3000 node test_script.js",
-    "test:production": "node test_script.js",
+    "test": "node test.js",
+    "test:ai": "node test-ai-features.js",
+    "test:local": "TEST_URL=http://localhost:3000 node test.js && node test-ai-features.js",
+    "test:production": "node test.js && node test-ai-features.js",
     "build": "echo 'No build step required for Node.js application'",
     "lint": "echo 'ESLint not configured - consider adding for production'",
     "health": "curl -f http://localhost:3000/health || exit 1",
+    "health:ai": "curl -f http://localhost:3000/debug | grep -q 'ai.*enabled' || echo 'AI features may not be enabled'",
     "logs": "echo 'Checking application logs...' && tail -n 50 /var/log/app.log 2>/dev/null || echo 'No logs found'",
     "clean": "echo 'Cleaning temporary files...' && rm -rf node_modules/.cache 2>/dev/null || true",
     "security-check": "npm audit --audit-level moderate",
-    "update-deps": "npm update && npm audit fix"
+    "update-deps": "npm update && npm audit fix",
+    "setup:ai": "echo 'Please configure AI service API keys in environment variables. See .env.example for details.'",
+    "demo:conversation": "echo 'AI Conversation Examples:' && echo '用戶: 台北今天空氣怎麼樣？' && echo '機器人: 我來幫您查詢台北的空氣品質狀況...'",
+    "cost:estimate": "echo 'AI服務成本估算:' && echo 'OpenAI GPT-3.5: ~$1-5/日 (中等使用量)' && echo 'Claude: 類似OpenAI，中文理解更佳' && echo 'Gemini: 較高免費額度'"
   },
   "keywords": [
     "line-bot",
@@ -31,29 +36,44 @@
     "gps",
     "smart",
     "ai",
+    "artificial-intelligence",
+    "natural-language-processing",
+    "nlp",
     "chatbot",
+    "conversation-ai",
+    "intent-recognition",
+    "entity-extraction",
+    "openai",
+    "gpt",
+    "claude",
+    "gemini",
     "flex-message",
-    "webhook"
+    "webhook",
+    "environmental-monitoring",
+    "health-advice",
+    "personalization",
+    "context-awareness"
   ],
   "author": {
-    "name": "Smart Air Quality Bot Team",
-    "email": "contact@airquality-bot.com",
-    "url": "https://github.com/your-username/smart-air-quality-bot"
+    "name": "Smart Air Quality AI Bot Team",
+    "email": "contact@airquality-ai-bot.com",
+    "url": "https://github.com/your-username/smart-air-quality-ai-bot"
   },
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/your-username/smart-air-quality-bot.git"
+    "url": "https://github.com/your-username/smart-air-quality-ai-bot.git"
   },
   "bugs": {
-    "url": "https://github.com/your-username/smart-air-quality-bot/issues"
+    "url": "https://github.com/your-username/smart-air-quality-ai-bot/issues"
   },
-  "homepage": "https://github.com/your-username/smart-air-quality-bot#readme",
+  "homepage": "https://github.com/your-username/smart-air-quality-ai-bot#readme",
   "dependencies": {
     "@line/bot-sdk": "^9.3.0",
     "express": "^4.18.2",
     "axios": "^1.6.2",
-    "node-cron": "^3.0.3"
+    "node-cron": "^3.0.3",
+    "openai": "^4.7.0"
   },
   "devDependencies": {
     "nodemon": "^3.0.2"
@@ -66,39 +86,96 @@
     "port": 3000,
     "cache_duration": 300000,
     "user_state_timeout": 600000,
-    "location_cache_timeout": 3600000
+    "location_cache_timeout": 3600000,
+    "ai_max_tokens": 300,
+    "ai_temperature": 0.7,
+    "conversation_history_length": 10
   },
   "nodemonConfig": {
     "watch": [
       "index.js",
-      "package.json"
+      "package.json",
+      ".env"
     ],
-    "ext": "js,json,html",
+    "ext": "js,json,html,env",
     "ignore": [
       "node_modules/",
       "*.log",
-      ".git/"
+      ".git/",
+      "test*.js"
     ],
-    "delay": 1000
+    "delay": 1000,
+    "env": {
+      "NODE_ENV": "development"
+    }
   },
   "deployment": {
     "platform": "render",
     "build_command": "npm install",
     "start_command": "npm start",
     "environment": "production",
-    "auto_deploy": true
+    "auto_deploy": true,
+    "health_check_path": "/health",
+    "ai_features": true
   },
-  "features": [
-    "real_time_air_quality_query",
-    "multi_city_comparison",
-    "smart_health_advice", 
-    "gps_location_query",
-    "natural_language_processing",
-    "flex_message_interface",
-    "api_caching",
-    "error_handling",
-    "auto_cleanup"
-  ],
+  "features": {
+    "core": [
+      "real_time_air_quality_query",
+      "multi_city_comparison",
+      "smart_health_advice", 
+      "gps_location_query",
+      "subscription_management",
+      "flex_message_interface",
+      "api_caching",
+      "error_handling",
+      "auto_cleanup"
+    ],
+    "ai_enhanced": [
+      "natural_language_processing",
+      "intent_classification",
+      "entity_extraction", 
+      "conversation_memory",
+      "context_awareness",
+      "personalized_responses",
+      "multi_ai_service_support",
+      "smart_fallback",
+      "conversation_logging",
+      "user_preference_learning"
+    ]
+  },
+  "ai_services": {
+    "supported": [
+      {
+        "name": "OpenAI GPT",
+        "models": ["gpt-3.5-turbo", "gpt-4"],
+        "env_key": "OPENAI_API_KEY",
+        "cost": "$0.002/1K tokens",
+        "features": ["high_quality", "fast_response", "english_optimized"],
+        "recommended": true
+      },
+      {
+        "name": "Anthropic Claude",
+        "models": ["claude-3-haiku", "claude-3-sonnet"],
+        "env_key": "ANTHROPIC_API_KEY", 
+        "cost": "Similar to OpenAI",
+        "features": ["chinese_optimized", "long_context", "safety_focused"],
+        "recommended_for": "chinese_users"
+      },
+      {
+        "name": "Google Gemini",
+        "models": ["gemini-pro"],
+        "env_key": "GOOGLE_AI_KEY",
+        "cost": "Higher free tier",
+        "features": ["multimodal", "free_tier", "fast_development"],
+        "recommended_for": "cost_conscious"
+      }
+    ],
+    "fallback": {
+      "enabled": true,
+      "method": "keyword_matching",
+      "description": "Basic NLP when AI services unavailable"
+    }
+  },
   "supported_cities": {
     "taiwan": [
       "taipei", "kaohsiung", "taichung", "tainan", "new-taipei", 
@@ -113,12 +190,33 @@
       "mumbai", "delhi", "london", "paris", "berlin", "rome", "madrid",
       "new-york", "los-angeles", "chicago", "toronto", "vancouver",
       "sydney", "melbourne"
+    ],
+    "total_count": 52
+  },
+  "conversation_examples": {
+    "natural_queries": [
+      "台北今天空氣怎麼樣？",
+      "我想要跑步，現在適合嗎？",
+      "台中和高雄哪個空氣比較好？",
+      "附近有空氣品質監測站嗎？",
+      "幫我設定空氣品質提醒",
+      "小孩可以出去玩嗎？",
+      "什麼是PM2.5？",
+      "空氣污染對健康有什麼影響？"
+    ],
+    "ai_responses": [
+      "智慧理解用戶意圖",
+      "提供個人化健康建議",
+      "記住對話上下文",
+      "自動執行相關功能"
     ]
   },
   "api_endpoints": {
     "health_check": "/health",
+    "debug_info": "/debug",
     "air_quality": "/api/air-quality/:city",
     "statistics": "/api/stats", 
+    "subscription_stats": "/api/subscriptions/stats",
     "webhook": "/webhook",
     "home": "/"
   },
@@ -127,23 +225,74 @@
       "LINE_CHANNEL_ACCESS_TOKEN",
       "LINE_CHANNEL_SECRET"
     ],
+    "ai_services": [
+      "OPENAI_API_KEY",
+      "ANTHROPIC_API_KEY", 
+      "GOOGLE_AI_KEY"
+    ],
     "optional": [
       "WAQI_TOKEN",
       "PORT",
-      "NODE_ENV"
+      "NODE_ENV",
+      "AI_MAX_TOKENS",
+      "AI_TEMPERATURE",
+      "CONVERSATION_HISTORY_LENGTH"
     ]
   },
   "monitoring": {
     "health_check_interval": "*/5 * * * *",
     "cache_cleanup_interval": "*/5 * * * *",
+    "conversation_cleanup_interval": "0 * * * *",
     "log_retention_days": 7,
-    "performance_metrics": true
+    "performance_metrics": true,
+    "ai_usage_tracking": true
   },
   "security": {
     "helmet": false,
     "cors": false,
     "rate_limiting": false,
     "input_validation": true,
-    "error_sanitization": true
+    "error_sanitization": true,
+    "api_key_protection": true,
+    "conversation_privacy": true,
+    "gdpr_compliant": true
+  },
+  "testing": {
+    "basic_functionality": "npm test",
+    "ai_features": "npm run test:ai",
+    "local_development": "npm run test:local",
+    "production_deployment": "npm run test:production",
+    "coverage_tools": "none",
+    "performance_testing": "included"
+  },
+  "documentation": {
+    "setup_guide": "AI-SETUP.md",
+    "api_reference": "README-AI-Enhanced.md",
+    "deployment_guide": "README.md",
+    "troubleshooting": "README-AI-Enhanced.md#故障排除",
+    "examples": ".env.example"
+  },
+  "cost_optimization": {
+    "caching": "Reduce duplicate AI calls",
+    "token_limits": "Control response length",
+    "smart_fallback": "Use basic NLP when possible",
+    "monitoring": "Track usage and costs"
+  },
+  "future_roadmap": {
+    "v3.1": [
+      "多語言支援",
+      "語音訊息理解",
+      "圖片分析功能"
+    ],
+    "v3.2": [
+      "本地LLM支援", 
+      "專業環境模型",
+      "群組功能"
+    ],
+    "v4.0": [
+      "IoT感測器整合",
+      "健康追蹤系統",
+      "社群功能"
+    ]
   }
 }
