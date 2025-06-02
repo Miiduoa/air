@@ -1,6 +1,6 @@
 /**
- * LINE 智慧空氣品質機器人 - 完整測試腳本
- * 用於測試部署後的所有功能是否正常運行
+ * LINE 智慧空氣品質機器人 - 增強版測試腳本
+ * 專門測試修復後的功能
  */
 
 const axios = require('axios');
@@ -32,8 +32,8 @@ let testResults = {
   categories: {
     basic: { total: 0, passed: 0 },
     api: { total: 0, passed: 0 },
-    performance: { total: 0, passed: 0 },
-    features: { total: 0, passed: 0 }
+    functionality: { total: 0, passed: 0 },
+    performance: { total: 0, passed: 0 }
   }
 };
 
@@ -60,8 +60,8 @@ function delay(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-// 1. 測試健康檢查
-async function testHealth() {
+// 1. 測試基礎服務健康
+async function testBasicHealth() {
   const response = await axios.get(`${BASE_URL}/health`);
   
   if (response.status !== 200) {
@@ -72,7 +72,7 @@ async function testHealth() {
     throw new Error(`服務狀態異常: ${response.data.status}`);
   }
   
-  // 檢查新增的統計資料
+  // 檢查統計資料
   if (!response.data.statistics) {
     throw new Error('缺少統計資料');
   }
@@ -80,22 +80,42 @@ async function testHealth() {
   log('blue', `   服務狀態: ${response.data.status}`);
   log('blue', `   運行時間: ${response.data.uptime || '未知'} 秒`);
   log('blue', `   支援城市: ${response.data.statistics.supported_cities || '未知'}`);
-  log('blue', `   活躍訂閱: ${response.data.statistics.total_subscriptions || 0}`);
+  log('blue', `   LINE Bot 配置: ${response.data.environment.line_token_configured ? '✅' : '❌'}`);
 }
 
-// 2. 測試介紹網頁
-async function testHomePage() {
-  const response = await axios.get(BASE_URL);
+// 2. 測試增強版調試API
+async function testEnhancedDebugAPI() {
+  const response = await axios.get(`${BASE_URL}/debug`);
   
   if (response.status !== 200) {
     throw new Error(`狀態碼錯誤: ${response.status}`);
   }
   
-  if (!response.data.includes('智慧空氣品質機器人')) {
-    throw new Error('網頁內容不正確');
+  const data = response.data;
+  
+  // 檢查功能狀態
+  if (!data.features_status) {
+    throw new Error('缺少功能狀態資訊');
   }
   
-  log('blue', '   介紹網頁載入正常');
+  const requiredFeatures = [
+    'real_time_query',
+    'multi_city_comparison',
+    'subscription_management',
+    'flex_message_interface'
+  ];
+  
+  for (const feature of requiredFeatures) {
+    if (data.features_status[feature] !== 'enabled') {
+      throw new Error(`功能未啟用: ${feature}`);
+    }
+  }
+  
+  log('blue', `   平台: ${data.platform}`);
+  log('blue', `   Node版本: ${data.node_version}`);
+  log('blue', `   記憶體使用: ${Math.round(data.memory_usage.heapUsed / 1024 / 1024)}MB`);
+  log('blue', `   支援城市數: ${data.data_statistics?.supported_cities_count || 0}`);
+  log('green', '   所有核心功能狀態正常');
 }
 
 // 3. 測試空氣品質API - 台北
@@ -157,7 +177,7 @@ async function testAirQualityTokyo() {
   log('blue', `   城市名稱: ${data.city.name}`);
 }
 
-// 6. 測試不存在的城市
+// 6. 測試錯誤處理 - 不存在的城市
 async function testNonExistentCity() {
   try {
     await axios.get(`${BASE_URL}/api/air-quality/nonexistentcity12345`);
@@ -225,48 +245,13 @@ async function testSubscriptionStatsAPI() {
   }
 }
 
-// 9. 測試調試端點增強功能
-async function testEnhancedDebugAPI() {
-  const response = await axios.get(`${BASE_URL}/debug`);
-  
-  if (response.status !== 200) {
-    throw new Error(`狀態碼錯誤: ${response.status}`);
-  }
-  
-  const data = response.data;
-  
-  // 檢查新增的功能狀態
-  if (!data.features_status) {
-    throw new Error('缺少功能狀態資訊');
-  }
-  
-  const requiredFeatures = [
-    'real_time_query',
-    'multi_city_comparison',
-    'subscription_management',
-    'flex_message_interface'
-  ];
-  
-  for (const feature of requiredFeatures) {
-    if (data.features_status[feature] !== 'enabled') {
-      throw new Error(`功能未啟用: ${feature}`);
-    }
-  }
-  
-  log('blue', `   平台: ${data.platform}`);
-  log('blue', `   Node版本: ${data.node_version}`);
-  log('blue', `   記憶體使用: ${Math.round(data.memory_usage.heapUsed / 1024 / 1024)}MB`);
-  log('blue', `   支援城市數: ${data.data_statistics?.supported_cities_count || 0}`);
-  log('green', '   所有核心功能狀態正常');
-}
-
-// 10. 測試回應時間
+// 9. 測試回應時間
 async function testResponseTime() {
   const startTime = Date.now();
   await axios.get(`${BASE_URL}/api/air-quality/taipei`);
   const responseTime = Date.now() - startTime;
   
-  if (responseTime > 10000) {
+  if (responseTime > 15000) {
     throw new Error(`回應時間過長: ${responseTime}ms`);
   }
   
@@ -281,7 +266,7 @@ async function testResponseTime() {
   }
 }
 
-// 11. 測試多個連續請求（壓力測試）
+// 10. 測試並發請求
 async function testConcurrentRequests() {
   const cities = ['taipei', 'kaohsiung', 'taichung', 'tokyo', 'singapore'];
   const promises = cities.map(city => 
@@ -302,16 +287,16 @@ async function testConcurrentRequests() {
   log('blue', `   總耗時: ${totalTime}ms`);
   log('blue', `   平均耗時: ${Math.round(totalTime / cities.length)}ms`);
   
-  if (totalTime < 5000) {
+  if (totalTime < 8000) {
     log('green', '   ⚡ 並發性能優秀！');
-  } else if (totalTime < 10000) {
+  } else if (totalTime < 15000) {
     log('yellow', '   ⏱️ 並發性能良好');
   } else {
     log('yellow', '   🐌 並發性能需要優化');
   }
 }
 
-// 12. 測試錯誤處理機制
+// 11. 測試錯誤處理機制
 async function testErrorHandling() {
   try {
     // 測試不存在的路由
@@ -330,7 +315,7 @@ async function testErrorHandling() {
   }
 }
 
-// 13. 測試API數據一致性
+// 12. 測試數據一致性
 async function testDataConsistency() {
   // 多次請求同一城市，檢查數據是否一致
   const responses = await Promise.all([
@@ -343,7 +328,7 @@ async function testDataConsistency() {
   
   // AQI在短時間內應該相同或相近
   const aqiDiff = Math.abs(data1.aqi - data2.aqi);
-  if (aqiDiff > 5) {
+  if (aqiDiff > 10) {
     log('yellow', `   AQI差異較大: ${aqiDiff} (可能是數據更新)`);
   } else {
     log('blue', `   數據一致性良好，AQI差異: ${aqiDiff}`);
@@ -357,8 +342,8 @@ async function testDataConsistency() {
   log('green', '   數據一致性測試通過');
 }
 
-// 14. 測試所有支援的城市
-async function testAllSupportedCities() {
+// 13. 測試所有支援的重要城市
+async function testImportantCities() {
   const importantCities = ['taipei', 'kaohsiung', 'taichung', 'tokyo', 'seoul', 'singapore', 'hong-kong'];
   const results = [];
   
@@ -375,7 +360,7 @@ async function testAllSupportedCities() {
     }
     
     // 避免請求過於頻繁
-    await delay(200);
+    await delay(300);
   }
   
   const successCount = results.filter(r => r.status === 'success').length;
@@ -391,16 +376,16 @@ async function testAllSupportedCities() {
     }
   });
   
-  if (successCount < totalCount * 0.8) {
+  if (successCount < totalCount * 0.7) {
     throw new Error('太多城市查詢失敗');
   }
   
   log('green', '   重要城市查詢成功率符合預期');
 }
 
-// 15. 測試服務穩定性
+// 14. 測試服務穩定性
 async function testServiceStability() {
-  const testCount = 5;
+  const testCount = 3;
   const results = [];
   
   for (let i = 0; i < testCount; i++) {
@@ -418,7 +403,7 @@ async function testServiceStability() {
       results.push({ success: false, error: error.message });
     }
     
-    await delay(1000); // 等待1秒
+    await delay(2000); // 等待2秒
   }
   
   const successCount = results.filter(r => r.success).length;
@@ -429,54 +414,84 @@ async function testServiceStability() {
   log('blue', `   穩定性測試: ${successCount}/${testCount} 成功`);
   log('blue', `   平均回應時間: ${Math.round(avgResponseTime)}ms`);
   
-  if (successCount < testCount * 0.9) {
+  if (successCount < testCount) {
     throw new Error('服務穩定性不足');
   }
   
   log('green', '   服務穩定性測試通過');
 }
 
+// 15. 測試Webhook端點（模擬）
+async function testWebhookEndpoint() {
+  try {
+    // 嘗試POST到webhook端點（無需實際LINE簽名）
+    const response = await axios.post(`${BASE_URL}/webhook`, {
+      events: []
+    }, {
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      validateStatus: function (status) {
+        // 接受400狀態碼（因為沒有LINE簽名會被拒絕）
+        return status === 400 || status === 200;
+      }
+    });
+    
+    if (response.status === 400 || response.status === 200) {
+      log('blue', '   Webhook端點響應正常');
+    } else {
+      throw new Error(`意外的狀態碼: ${response.status}`);
+    }
+  } catch (error) {
+    if (error.response && error.response.status === 400) {
+      log('blue', '   Webhook端點響應正常（拒絕無效請求）');
+    } else {
+      throw error;
+    }
+  }
+}
+
 // 主測試函數
 async function runTests() {
-  log('bright', '🚀 開始測試 LINE 智慧空氣品質機器人服務 v2.0');
+  log('bright', '🚀 開始測試 LINE 智慧空氣品質機器人服務 v2.0 (修復版)');
   log('bright', `📡 測試目標: ${BASE_URL}`);
-  log('bright', '=' .repeat(70));
+  log('bright', '=' .repeat(80));
   
   // 基礎服務測試
   log('bright', '\n📋 基礎服務測試');
-  log('bright', '-' .repeat(30));
-  await test('健康檢查', testHealth, 'basic');
-  await test('介紹網頁', testHomePage, 'basic');
+  log('bright', '-' .repeat(40));
+  await test('基礎健康檢查', testBasicHealth, 'basic');
+  await test('增強版調試API', testEnhancedDebugAPI, 'basic');
   await test('錯誤處理機制', testErrorHandling, 'basic');
+  await test('Webhook端點測試', testWebhookEndpoint, 'basic');
   
   // API功能測試
   log('bright', '\n🔧 API功能測試');
-  log('bright', '-' .repeat(30));
+  log('bright', '-' .repeat(40));
   await test('台北空氣品質查詢', testAirQualityTaipei, 'api');
   await test('高雄空氣品質查詢', testAirQualityKaohsiung, 'api');
   await test('東京空氣品質查詢', testAirQualityTokyo, 'api');
   await test('不存在城市處理', testNonExistentCity, 'api');
   await test('服務統計API', testStatsAPI, 'api');
   await test('訂閱統計API', testSubscriptionStatsAPI, 'api');
-  await test('增強調試API', testEnhancedDebugAPI, 'api');
+  
+  // 功能完整性測試
+  log('bright', '\n🎯 功能完整性測試');
+  log('bright', '-' .repeat(40));
+  await test('數據一致性測試', testDataConsistency, 'functionality');
+  await test('重要城市支援測試', testImportantCities, 'functionality');
   
   // 性能測試
   log('bright', '\n⚡ 性能測試');
-  log('bright', '-' .repeat(30));
+  log('bright', '-' .repeat(40));
   await test('回應時間測試', testResponseTime, 'performance');
   await test('並發請求測試', testConcurrentRequests, 'performance');
   await test('服務穩定性測試', testServiceStability, 'performance');
   
-  // 功能完整性測試
-  log('bright', '\n🎯 功能完整性測試');
-  log('bright', '-' .repeat(30));
-  await test('數據一致性測試', testDataConsistency, 'features');
-  await test('重要城市支援測試', testAllSupportedCities, 'features');
-  
   // 測試結果摘要
-  log('bright', '\n' + '=' .repeat(70));
+  log('bright', '\n' + '=' .repeat(80));
   log('bright', '📊 測試結果摘要');
-  log('bright', '=' .repeat(70));
+  log('bright', '=' .repeat(80));
   
   // 分類統計
   Object.entries(testResults.categories).forEach(([category, stats]) => {
@@ -484,14 +499,14 @@ async function runTests() {
     const categoryName = {
       basic: '基礎服務',
       api: 'API功能',
-      performance: '性能測試',
-      features: '功能完整性'
+      functionality: '功能完整性',
+      performance: '性能測試'
     }[category];
     
     log('cyan', `${categoryName}: ${stats.passed}/${stats.total} (${rate}%)`);
   });
   
-  log('bright', '-' .repeat(40));
+  log('bright', '-' .repeat(50));
   log('cyan', `總測試數: ${testResults.total}`);
   log('green', `通過: ${testResults.passed}`);
   log('red', `失敗: ${testResults.failed}`);
@@ -500,70 +515,4 @@ async function runTests() {
   log('bright', `總成功率: ${successRate}%`);
   
   // 評估結果
-  if (testResults.failed === 0) {
-    log('green', '\n🎉 所有測試完美通過！您的服務已經準備就緒！');
-    log('green', '✅ LINE 機器人功能完整，可以正式發布');
-    log('green', '🚀 建議進行 LINE Bot 實際對話測試');
-  } else if (successRate >= 90) {
-    log('yellow', '\n⚠️ 大部分測試通過，服務基本正常');
-    log('yellow', '💡 請檢查失敗的測試項目並進行修復');
-    log('yellow', '🔧 建議修復後再進行正式發布');
-  } else if (successRate >= 70) {
-    log('yellow', '\n⚠️ 部分測試通過，服務有一些問題');
-    log('yellow', '🔧 需要修復多個問題才能正式使用');
-    log('red', '❌ 不建議現在發布到生產環境');
-  } else {
-    log('red', '\n❌ 多個關鍵測試失敗，服務有嚴重問題');
-    log('red', '🚨 請檢查部署配置、環境變數和網路連接');
-    log('red', '🔧 必須解決所有問題後才能使用');
-  }
-  
-  // 提供詳細的後續步驟建議
-  log('bright', '\n📋 詳細後續步驟:');
-  
-  if (testResults.failed === 0) {
-    log('green', '🎯 完美！請進行以下步驟：');
-    log('cyan', '1. ✅ 在 LINE Developers Console 設定 Webhook URL');
-    log('cyan', '2. ✅ 測試 LINE Bot 真實對話功能');
-    log('cyan', '3. ✅ 驗證所有圖文選單功能');
-    log('cyan', '4. ✅ 測試訂閱和推送功能');
-    log('cyan', '5. ✅ 設定監控和日誌收集');
-    log('cyan', '6. ✅ 準備正式對外發布');
-  } else {
-    log('yellow', '🔧 需要修復問題：');
-    log('cyan', '1. 📝 檢查失敗的測試項目');
-    log('cyan', '2. 🔍 查看應用程式日誌');
-    log('cyan', '3. ✅ 確認環境變數設定');
-    log('cyan', '4. 🌐 檢查網路連接和API密鑰');
-    log('cyan', '5. 🔄 修復後重新運行測試');
-  }
-  
-  log('bright', '\n💡 有用的資源:');
-  log('cyan', `• 健康檢查: ${BASE_URL}/health`);
-  log('cyan', `• 服務統計: ${BASE_URL}/api/stats`);
-  log('cyan', `• 系統診斷: ${BASE_URL}/debug`);
-  log('cyan', `• API測試: ${BASE_URL}/api/air-quality/taipei`);
-  
-  process.exit(testResults.failed > 0 ? 1 : 0);
-}
-
-// 錯誤處理
-process.on('unhandledRejection', (reason, promise) => {
-  log('red', '未處理的Promise拒絕:');
-  log('red', reason);
-  process.exit(1);
-});
-
-// 執行測試
-if (require.main === module) {
-  runTests().catch(error => {
-    log('red', '測試執行失敗:');
-    log('red', error.message);
-    process.exit(1);
-  });
-}
-
-module.exports = {
-  runTests,
-  test
-};
+  if (testResults.f

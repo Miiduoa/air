@@ -63,6 +63,7 @@ const cityMap = {
 // 用戶狀態管理
 function setUserState(userId, state, context = {}) {
   userStates.set(userId, { state, context, timestamp: Date.now() });
+  console.log(`設定用戶狀態: ${userId} -> ${state}`);
 }
 
 function getUserState(userId) {
@@ -76,6 +77,7 @@ function getUserState(userId) {
 
 function clearUserState(userId) {
   userStates.delete(userId);
+  console.log(`清除用戶狀態: ${userId}`);
 }
 
 // 計算兩點間距離（公里）
@@ -132,6 +134,7 @@ function addSubscription(userId, city) {
   const userSub = subscriptions.get(userId);
   if (!userSub.cities.includes(city)) {
     userSub.cities.push(city);
+    console.log(`用戶 ${userId} 訂閱了 ${city}`);
     return true;
   }
   return false;
@@ -143,6 +146,7 @@ function removeSubscription(userId, city) {
     const index = userSub.cities.indexOf(city);
     if (index > -1) {
       userSub.cities.splice(index, 1);
+      console.log(`用戶 ${userId} 取消訂閱了 ${city}`);
       return true;
     }
   }
@@ -152,13 +156,21 @@ function removeSubscription(userId, city) {
 function removeAllSubscriptions(userId) {
   if (subscriptions.has(userId)) {
     subscriptions.delete(userId);
+    console.log(`用戶 ${userId} 清除了所有訂閱`);
     return true;
   }
   return false;
 }
 
 function getUserSubscriptions(userId) {
-  return subscriptions.get(userId) || { cities: [], settings: {} };
+  return subscriptions.get(userId) || { 
+    cities: [], 
+    settings: {
+      dailyReport: true,
+      emergencyAlert: true,
+      threshold: 100
+    }
+  };
 }
 
 function updateUserSettings(userId, settings) {
@@ -175,6 +187,7 @@ function updateUserSettings(userId, settings) {
   
   const userSub = subscriptions.get(userId);
   userSub.settings = { ...userSub.settings, ...settings };
+  console.log(`用戶 ${userId} 更新設定:`, settings);
   return userSub.settings;
 }
 
@@ -295,7 +308,7 @@ function getHealthAdvice(aqi) {
   }
 }
 
-// 解析自然語言查詢
+// 解析自然語言查詢 - 修復版本
 function parseQuery(text) {
   const cleanText = text.toLowerCase().replace(/[空氣品質|空氣|空品|pm2.5|aqi|查詢|怎麼樣|如何]/g, '');
   
@@ -375,6 +388,7 @@ function parseCompareQuery(text) {
 async function getAirQuality(city) {
   try {
     const url = `${WAQI_BASE_URL}/feed/${city}/?token=${WAQI_TOKEN}`;
+    console.log(`查詢空氣品質: ${city}`);
     const response = await axios.get(url);
     
     if (response.data.status === 'ok') {
@@ -2334,8 +2348,10 @@ function createErrorFlexMessage(errorType, message) {
   };
 }
 
-// 處理LINE訊息
+// 修復後的主要事件處理函數
 async function handleEvent(event) {
+  console.log('收到事件:', event.type, event.message?.type || 'non-message');
+  
   if (event.type !== 'message') {
     return Promise.resolve(null);
   }
@@ -2365,6 +2381,7 @@ async function handleEvent(event) {
   }
 
   const userMessage = event.message.text;
+  console.log(`用戶 ${userId} 發送訊息: ${userMessage}`);
   
   try {
     // 檢查用戶狀態
@@ -2372,6 +2389,7 @@ async function handleEvent(event) {
     
     // 處理有狀態的對話
     if (userState) {
+      console.log(`處理用戶狀態: ${userState.state}`);
       return await handleStatefulMessage(event, userState);
     }
     
@@ -2394,14 +2412,13 @@ async function handleEvent(event) {
       return client.replyMessage(event.replyToken, settingsMessage);
     }
 
-    // 處理設定相關指令
-    if (userMessage.includes('開啟每日報告') || userMessage.includes('關閉每日報告')) {
-      const enable = userMessage.includes('開啟');
-      updateUserSettings(userId, { dailyReport: enable });
+    // 修復：處理設定相關指令 - 確保有正確的回應
+    if (userMessage.includes('開啟每日報告')) {
+      updateUserSettings(userId, { dailyReport: true });
       
       const confirmMessage = {
         type: 'flex',
-        altText: `每日報告已${enable ? '開啟' : '關閉'}`,
+        altText: '每日報告已開啟',
         contents: {
           type: 'bubble',
           body: {
@@ -2410,10 +2427,19 @@ async function handleEvent(event) {
             contents: [
               {
                 type: 'text',
-                text: `✅ 每日報告已${enable ? '開啟' : '關閉'}`,
+                text: '✅ 每日報告已開啟',
                 weight: 'bold',
                 color: '#4CAF50',
                 align: 'center'
+              },
+              {
+                type: 'text',
+                text: '我們會在每天早上8點為您推送空氣品質報告',
+                color: '#666666',
+                size: 'sm',
+                align: 'center',
+                margin: 'md',
+                wrap: true
               }
             ]
           },
@@ -2439,13 +2465,12 @@ async function handleEvent(event) {
       return client.replyMessage(event.replyToken, confirmMessage);
     }
 
-    if (userMessage.includes('開啟緊急警報') || userMessage.includes('關閉緊急警報')) {
-      const enable = userMessage.includes('開啟');
-      updateUserSettings(userId, { emergencyAlert: enable });
+    if (userMessage.includes('關閉每日報告')) {
+      updateUserSettings(userId, { dailyReport: false });
       
       const confirmMessage = {
         type: 'flex',
-        altText: `緊急警報已${enable ? '開啟' : '關閉'}`,
+        altText: '每日報告已關閉',
         contents: {
           type: 'bubble',
           body: {
@@ -2454,10 +2479,19 @@ async function handleEvent(event) {
             contents: [
               {
                 type: 'text',
-                text: `✅ 緊急警報已${enable ? '開啟' : '關閉'}`,
+                text: '✅ 每日報告已關閉',
                 weight: 'bold',
                 color: '#4CAF50',
                 align: 'center'
+              },
+              {
+                type: 'text',
+                text: '我們已停止推送每日空氣品質報告',
+                color: '#666666',
+                size: 'sm',
+                align: 'center',
+                margin: 'md',
+                wrap: true
               }
             ]
           },
@@ -2483,6 +2517,111 @@ async function handleEvent(event) {
       return client.replyMessage(event.replyToken, confirmMessage);
     }
 
+    if (userMessage.includes('開啟緊急警報')) {
+      updateUserSettings(userId, { emergencyAlert: true });
+      
+      const confirmMessage = {
+        type: 'flex',
+        altText: '緊急警報已開啟',
+        contents: {
+          type: 'bubble',
+          body: {
+            type: 'box',
+            layout: 'vertical',
+            contents: [
+              {
+                type: 'text',
+                text: '✅ 緊急警報已開啟',
+                weight: 'bold',
+                color: '#4CAF50',
+                align: 'center'
+              },
+              {
+                type: 'text',
+                text: '當空氣品質超過設定閾值時，我們會立即通知您',
+                color: '#666666',
+                size: 'sm',
+                align: 'center',
+                margin: 'md',
+                wrap: true
+              }
+            ]
+          },
+          footer: {
+            type: 'box',
+            layout: 'vertical',
+            spacing: 'sm',
+            contents: [
+              {
+                type: 'button',
+                style: 'secondary',
+                action: {
+                  type: 'message',
+                  label: '↩️ 回到設定',
+                  text: '我的設定'
+                }
+              }
+            ]
+          }
+        }
+      };
+      
+      return client.replyMessage(event.replyToken, confirmMessage);
+    }
+
+    if (userMessage.includes('關閉緊急警報')) {
+      updateUserSettings(userId, { emergencyAlert: false });
+      
+      const confirmMessage = {
+        type: 'flex',
+        altText: '緊急警報已關閉',
+        contents: {
+          type: 'bubble',
+          body: {
+            type: 'box',
+            layout: 'vertical',
+            contents: [
+              {
+                type: 'text',
+                text: '✅ 緊急警報已關閉',
+                weight: 'bold',
+                color: '#4CAF50',
+                align: 'center'
+              },
+              {
+                type: 'text',
+                text: '我們已停止推送緊急警報通知',
+                color: '#666666',
+                size: 'sm',
+                align: 'center',
+                margin: 'md',
+                wrap: true
+              }
+            ]
+          },
+          footer: {
+            type: 'box',
+            layout: 'vertical',
+            spacing: 'sm',
+            contents: [
+              {
+                type: 'button',
+                style: 'secondary',
+                action: {
+                  type: 'message',
+                  label: '↩️ 回到設定',
+                  text: '我的設定'
+                }
+              }
+            ]
+          }
+        }
+      };
+      
+      return client.replyMessage(event.replyToken, confirmMessage);
+    }
+
+    // 修復：處理警報閾值設定
     if (userMessage.includes('設定警報閾值')) {
       const thresholdMatch = userMessage.match(/設定警報閾值(\d+)/);
       if (thresholdMatch) {
@@ -2504,6 +2643,15 @@ async function handleEvent(event) {
                   weight: 'bold',
                   color: '#4CAF50',
                   align: 'center',
+                  wrap: true
+                },
+                {
+                  type: 'text',
+                  text: `當空氣品質指數超過 ${threshold} 時，我們會發送警報通知`,
+                  color: '#666666',
+                  size: 'sm',
+                  align: 'center',
+                  margin: 'md',
                   wrap: true
                 }
               ]
@@ -2746,6 +2894,7 @@ async function handleEvent(event) {
 
     // 解析查詢的內容
     const queryResult = parseQuery(userMessage);
+    console.log('查詢解析結果:', queryResult);
     
     // 處理訂閱功能
     if (queryResult && queryResult.type === 'subscribe') {
@@ -2958,6 +3107,7 @@ async function handleEvent(event) {
 
     // 處理多城市比較
     if (queryResult && queryResult.type === 'compare') {
+      console.log('開始比較城市:', queryResult.cities);
       const citiesData = await getMultipleCitiesAirQuality(queryResult.cities);
       
       if (citiesData.length === 0) {
@@ -2978,6 +3128,7 @@ async function handleEvent(event) {
 
     // 處理單城市查詢
     if (queryResult && queryResult.type === 'single') {
+      console.log('查詢單一城市:', queryResult.city);
       const airQualityData = await getAirQuality(queryResult.city);
       const flexMessage = createAirQualityFlexMessage(airQualityData);
       
@@ -3069,6 +3220,7 @@ async function handleEvent(event) {
     }
     
     // 如果沒有匹配到任何指令，顯示錯誤訊息和主選單
+    console.log('無法識別的指令:', userMessage);
     const notFoundMessage = createErrorFlexMessage('not_found', '我無法識別您的指令。請使用下方選單或嘗試直接輸入城市名稱。');
     const menuMessage = createMainMenuFlexMessage();
     
@@ -3084,10 +3236,12 @@ async function handleEvent(event) {
   }
 }
 
-// 處理有狀態的對話
+// 修復後的有狀態對話處理函數
 async function handleStatefulMessage(event, userState) {
   const userId = event.source.userId;
   const userMessage = event.message.text;
+  
+  console.log(`處理有狀態訊息: ${userState.state}, 訊息: ${userMessage}`);
   
   try {
     if (userState.state === 'awaiting_compare_cities') {
@@ -3118,6 +3272,7 @@ async function handleStatefulMessage(event, userState) {
         cities.splice(5); // 限制最多5個城市
       }
       
+      console.log('比較城市:', cities);
       const citiesData = await getMultipleCitiesAirQuality(cities);
       
       if (citiesData.length === 0) {
@@ -3240,9 +3395,13 @@ async function handleStatefulMessage(event, userState) {
 
 // Webhook端點
 app.post('/webhook', line.middleware(config), (req, res) => {
+  console.log('收到 Webhook 請求');
   Promise
     .all(req.body.events.map(handleEvent))
-    .then((result) => res.json(result))
+    .then((result) => {
+      console.log('Webhook 處理完成');
+      res.json(result);
+    })
     .catch((err) => {
       console.error('Webhook處理錯誤:', err);
       res.status(500).end();
