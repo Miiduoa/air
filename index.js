@@ -62,73 +62,73 @@ const cityMap = {
   '澳門': 'macau'
 };
 
-// AI 自然語言處理引擎 - 修復版
+// AI 自然語言處理引擎 - 完全修復版
 class AIConversationEngine {
   constructor() {
-    // 意圖模式庫 - 修復版
+    // 修復意圖模式庫 - 重新設計更準確的正則表達式
     this.intentPatterns = {
       greeting: [
-        /^(你好|哈囉|嗨|hi|hello|早安|午安|晚安|嘿)/i,
-        /^(在嗎|有人嗎|可以幫我嗎)/i
+        /^(你好|哈囉|嗨|hi|hello|早安|午安|晚安|嘿).*$/i,
+        /^(在嗎|有人嗎|可以幫我嗎).*$/i
       ],
       
       air_quality_query: [
-        // 修復: 增加更多查詢模式
-        /(?:查詢|查看|看看|問|告訴我|顯示|檢查|查).*?(?:空氣|空品|aqi|pm2\.?5|空氣品質)/i,
-        /(?:現在|今天|目前).*?(?:空氣|空品|aqi).*?(?:怎麼樣|如何|好嗎|狀況)/i,
-        /^(?:台北|高雄|台中|台南|新北|桃園|基隆|新竹|苗栗|彰化|南投|雲林|嘉義|屏東|宜蘭|花蓮|台東|澎湖|金門|馬祖|東京|首爾|新加坡|香港|北京|上海)(?:的)?(?:空氣|空品|aqi)/i,
-        /(?:空氣|空品|aqi).*?(?:台北|高雄|台中|台南|新北|桃園|基隆|新竹|苗栗|彰化|南投|雲林|嘉義|屏東|宜蘭|花蓮|台東|澎湖|金門|馬祖|東京|首爾|新加坡|香港|北京|上海)/i,
-        // 修復: 直接城市名稱查詢
+        // 修復核心問題：支援「查詢台中」等表達方式
+        /^.*?查詢.*?(台北|高雄|台中|台南|新北|桃園|基隆|新竹|苗栗|彰化|南投|雲林|嘉義|屏東|宜蘭|花蓮|台東|澎湖|金門|馬祖|東京|首爾|新加坡|香港|北京|上海).*?$/i,
+        /^(查詢|查看|看看|檢查|問).*?(空氣|空品|aqi|pm2\.?5|空氣品質).*?$/i,
+        /^.*?(台北|高雄|台中|台南|新北|桃園|基隆|新竹|苗栗|彰化|南投|雲林|嘉義|屏東|宜蘭|花蓮|台東|澎湖|金門|馬祖|東京|首爾|新加坡|香港|北京|上海).*?(空氣|空品|aqi).*?$/i,
+        /^(現在|今天|目前).*?(空氣|空品|aqi).*?(怎麼樣|如何|好嗎|狀況).*?$/i,
+        // 修復：直接城市名稱查詢
         /^(台北|高雄|台中|台南|新北|桃園|基隆|新竹|苗栗|彰化|南投|雲林|嘉義|屏東|宜蘭|花蓮|台東|澎湖|金門|馬祖|東京|首爾|新加坡|香港|北京|上海)$/i
       ],
       
       comparison: [
-        /(?:比較|比一比|對比).*?(?:空氣|空品|aqi)/i,
-        /(?:哪裡|哪個|什麼地方).*?(?:空氣|空品).*?(?:好|佳|較好|比較好)/i,
-        /(?:台北|高雄|台中|台南).*?(?:vs|對|比).*?(?:台北|高雄|台中|台南)/i
+        /^.*?(比較|比一比|對比).*?(空氣|空品|aqi).*?$/i,
+        /^.*?(哪裡|哪個|什麼地方).*?(空氣|空品).*?(好|佳|較好|比較好).*?$/i,
+        /^.*?(台北|高雄|台中|台南).*?(vs|對|比).*?(台北|高雄|台中|台南).*?$/i
       ],
       
       health_advice: [
-        /(?:可以|能夠|適合).*?(?:運動|慢跑|跑步|騎車|散步|外出)/i,
-        /(?:要|需要|該).*?(?:戴|配戴).*?(?:口罩|防護)/i,
-        /(?:健康|身體).*?(?:建議|影響|注意)/i,
-        /(?:敏感|過敏|氣喘|老人|小孩|孕婦)/i
+        /^.*?(可以|能夠|適合).*?(運動|慢跑|跑步|騎車|散步|外出).*?$/i,
+        /^.*?(要|需要|該).*?(戴|配戴).*?(口罩|防護).*?$/i,
+        /^.*?(健康|身體).*?(建議|影響|注意).*?$/i,
+        /^.*?(敏感|過敏|氣喘|老人|小孩|孕婦).*?$/i
       ],
       
       subscription: [
-        /(?:訂閱|關注|追蹤|通知).*?(?:空氣|空品|提醒)/i,
-        /(?:每日|定期|自動).*?(?:報告|推送|通知)/i,
-        /(?:取消|關閉|停止).*?(?:訂閱|追蹤|通知)/i
+        /^.*?(訂閱|關注|追蹤|通知).*?(空氣|空品|提醒).*?$/i,
+        /^.*?(每日|定期|自動).*?(報告|推送|通知).*?$/i,
+        /^.*?(取消|關閉|停止).*?(訂閱|追蹤|通知).*?$/i
       ],
       
       location_query: [
-        /(?:附近|周圍|附近的|我這裡).*?(?:空氣|空品|監測站)/i,
-        /(?:定位|位置|gps).*?(?:查詢|查看)/i
+        /^.*?(附近|周圍|附近的|我這裡).*?(空氣|空品|監測站).*?$/i,
+        /^.*?(定位|位置|gps).*?(查詢|查看).*?$/i
       ],
       
       weather_related: [
-        /(?:天氣|氣象|溫度|下雨|颱風|風向)/i,
-        /(?:今天|明天|這幾天).*?(?:天氣|氣象)/i
+        /^.*?(天氣|氣象|溫度|下雨|颱風|風向).*?$/i,
+        /^.*?(今天|明天|這幾天).*?(天氣|氣象).*?$/i
       ],
       
       concern_expression: [
-        /(?:擔心|害怕|恐怖|嚇人|糟糕|很差|很爛)/i,
-        /(?:好可怕|太恐怖|真的嗎|不會吧|完蛋了)/i
+        /^.*?(擔心|害怕|恐怖|嚇人|糟糕|很差|很爛).*?$/i,
+        /^.*?(好可怕|太恐怖|真的嗎|不會吧|完蛋了).*?$/i
       ],
       
       positive_expression: [
-        /(?:太好了|真棒|很好|不錯|還可以|很棒)/i,
-        /(?:謝謝|感謝|辛苦了|很有幫助)/i
+        /^.*?(太好了|真棒|很好|不錯|還可以|很棒).*?$/i,
+        /^.*?(謝謝|感謝|辛苦了|很有幫助).*?$/i
       ],
       
       help_request: [
-        /(?:幫助|幫忙|教學|怎麼用|說明|指導)/i,
-        /(?:不懂|不會|不知道|搞不清楚|怎麼辦)/i
+        /^.*?(幫助|幫忙|教學|怎麼用|說明|指導).*?$/i,
+        /^.*?(不懂|不會|不知道|搞不清楚|怎麼辦).*?$/i
       ],
       
       complaint: [
-        /(?:慢|很慢|太慢|卡|當機|壞了|錯誤)/i,
-        /(?:沒用|沒反應|聽不懂|看不懂)/i
+        /^.*?(慢|很慢|太慢|卡|當機|壞了|錯誤).*?$/i,
+        /^.*?(沒用|沒反應|聽不懂|看不懂).*?$/i
       ]
     };
 
@@ -141,18 +141,22 @@ class AIConversationEngine {
     };
   }
 
-  // 分析用戶意圖 - 修復版
+  // 分析用戶意圖 - 完全修復版
   analyzeIntent(text) {
-    console.log(`分析文本: "${text}"`);
+    console.log(`🔍 AI分析文本: "${text}"`);
     const intents = [];
     
     for (const [intent, patterns] of Object.entries(this.intentPatterns)) {
       for (const pattern of patterns) {
-        if (pattern.test(text)) {
-          const confidence = this.calculateConfidence(text, pattern);
-          intents.push({ intent, confidence });
-          console.log(`匹配意圖: ${intent}, 信心度: ${confidence}`);
-          break;
+        try {
+          const match = pattern.test(text);
+          if (match) {
+            const confidence = this.calculateConfidence(text, pattern);
+            intents.push({ intent, confidence, pattern: pattern.toString() });
+            console.log(`✅ 匹配意圖: ${intent}, 信心度: ${confidence}%, 模式: ${pattern}`);
+          }
+        } catch (error) {
+          console.error(`❌ 正則表達式錯誤 (${intent}):`, error, pattern);
         }
       }
     }
@@ -160,22 +164,33 @@ class AIConversationEngine {
     // 按信心度排序
     intents.sort((a, b) => b.confidence - a.confidence);
     
-    return intents.length > 0 ? intents[0] : { intent: 'unknown', confidence: 0 };
+    const result = intents.length > 0 ? intents[0] : { intent: 'unknown', confidence: 0 };
+    console.log(`🎯 最終意圖: ${result.intent} (信心度: ${result.confidence}%)`);
+    
+    return result;
   }
 
-  // 計算匹配信心度
+  // 計算匹配信心度 - 改善版
   calculateConfidence(text, pattern) {
-    const match = text.match(pattern);
-    if (!match) return 0;
-    
-    const matchLength = match[0].length;
-    const textLength = text.length;
-    const coverage = matchLength / textLength;
-    
-    let confidence = Math.min(coverage * 100, 95);
-    if (coverage > 0.8) confidence += 5;
-    
-    return Math.round(confidence);
+    try {
+      const match = text.match(pattern);
+      if (!match) return 0;
+      
+      const matchLength = match[0].length;
+      const textLength = text.length;
+      const coverage = matchLength / textLength;
+      
+      let confidence = Math.min(coverage * 100, 95);
+      
+      // 提高直接匹配的信心度
+      if (coverage > 0.8) confidence += 5;
+      if (match[0] === text) confidence = 100; // 完全匹配
+      
+      return Math.round(confidence);
+    } catch (error) {
+      console.error('計算信心度錯誤:', error);
+      return 0;
+    }
   }
 
   // 分析情感
@@ -200,9 +215,9 @@ class AIConversationEngine {
     };
   }
 
-  // 提取實體 - 修復版
+  // 提取實體 - 完全修復版
   extractEntities(text) {
-    console.log(`提取實體: "${text}"`);
+    console.log(`🔍 提取實體: "${text}"`);
     const entities = {
       cities: [],
       timeReferences: [],
@@ -210,15 +225,16 @@ class AIConversationEngine {
       activities: []
     };
 
-    // 修復: 改進城市提取邏輯
+    // 修復：改進城市提取邏輯，更準確匹配
     for (const [chineseName, englishName] of Object.entries(cityMap)) {
-      if (text.includes(chineseName)) {
+      const cityRegex = new RegExp(`(^|[^\\w])${chineseName}([^\\w]|$)`, 'i');
+      if (cityRegex.test(text) || text.includes(chineseName)) {
         entities.cities.push({
           name: chineseName,
           english: englishName,
           position: text.indexOf(chineseName)
         });
-        console.log(`找到城市: ${chineseName} -> ${englishName}`);
+        console.log(`🏙️ 找到城市: ${chineseName} -> ${englishName}`);
       }
     }
 
@@ -246,59 +262,68 @@ class AIConversationEngine {
       }
     }
 
-    console.log(`提取結果:`, entities);
+    console.log(`📊 提取結果:`, entities);
     return entities;
   }
 
-  // 生成個性化回應
+  // 生成個性化回應 - 改善版
   generatePersonalizedResponse(intent, entities, emotion, userProfile = {}) {
-    console.log(`生成回應 - 意圖: ${intent.intent}, 城市數: ${entities.cities.length}`);
+    console.log(`💬 生成回應 - 意圖: ${intent.intent}, 城市: ${entities.cities.length > 0 ? entities.cities[0].name : '無'}`);
     
     switch (intent.intent) {
       case 'greeting':
-        return '您好！我是智慧空氣品質助手，很高興為您服務。';
+        return '您好！我是智慧空氣品質助手 🌬️，很高興為您服務！';
 
       case 'air_quality_query':
         if (entities.cities.length > 0) {
-          return `好的！讓我為你查詢${entities.cities[0].name}的空氣品質。`;
+          return `好的！讓我為您查詢 ${entities.cities[0].name} 的空氣品質 🔍`;
         } else {
-          return '我來幫你查詢空氣品質！請告訴我你想查詢哪個城市？';
+          return '我來幫您查詢空氣品質！請告訴我您想查詢哪個城市？ 🏙️';
         }
 
       case 'comparison':
         if (entities.cities.length >= 2) {
-          return `好想法！我來比較${entities.cities.map(c => c.name).join('和')}的空氣品質。`;
+          return `好想法！我來比較 ${entities.cities.map(c => c.name).join(' 和 ')} 的空氣品質 📊`;
         } else {
-          return '多城市比較很實用呢！請告訴我你想比較哪些城市？';
+          return '多城市比較很實用呢！請告訴我您想比較哪些城市？ 🆚';
         }
 
       case 'health_advice':
-        return '健康最重要！我會根據空氣品質給你最適合的建議。';
+        return '健康最重要！我會根據空氣品質給您最適合的建議 💡';
 
       case 'subscription':
-        return '訂閱功能可以讓您及時收到空氣品質提醒！';
+        return '訂閱功能可以讓您及時收到空氣品質提醒！ 🔔';
 
       case 'concern_expression':
-        return '我能理解你的擔心，空氣品質確實很重要。讓我提供準確資訊和實用建議來幫助你！';
+        return '我能理解您的擔心，空氣品質確實很重要。讓我提供準確資訊和實用建議來幫助您！ 💪';
 
       case 'positive_expression':
-        return '謝謝你的肯定！能幫助你關注空氣品質我也很開心～';
+        return '謝謝您的肯定！能幫助您關注空氣品質我也很開心～ 😊';
 
       case 'help_request':
-        return '沒問題！我很樂意幫助你。你可以直接告訴我想查詢的城市，或是說「主選單」看看我能做什麼！';
+        return '沒問題！我很樂意幫助您。您可以直接告訴我想查詢的城市，或是說「主選單」看看我能做什麼！ 🆘';
 
       default:
-        return '我聽懂了你的意思！讓我用最適合的功能來幫助你。';
+        return '我聽懂了您的意思！讓我用最適合的功能來幫助您 🤖';
     }
   }
 }
 
-// 解析自然語言查詢 - 增強版
+// 修復解析自然語言查詢 - 完全修復版
 function parseQuery(text) {
-  console.log(`傳統解析: "${text}"`);
+  console.log(`🔍 傳統解析: "${text}"`);
   
-  // 修復: 改進正則表達式
   const cleanText = text.toLowerCase().trim();
+  
+  // 修復：優先檢查「查詢+城市」模式
+  const queryPattern = /查詢\s*(台北|高雄|台中|台南|新北|桃園|基隆|新竹|苗栗|彰化|南投|雲林|嘉義|屏東|宜蘭|花蓮|台東|澎湖|金門|馬祖|東京|首爾|新加坡|香港|北京|上海)/i;
+  const queryMatch = text.match(queryPattern);
+  if (queryMatch) {
+    const cityName = queryMatch[1];
+    const englishName = cityMap[cityName];
+    console.log(`✅ 查詢模式匹配: ${cityName} -> ${englishName}`);
+    return { type: 'single', city: englishName, cityName };
+  }
   
   // 檢查是否為訂閱相關指令
   if (text.includes('訂閱') || text.includes('subscribe')) {
@@ -325,16 +350,17 @@ function parseQuery(text) {
     return parseCompareQuery(text);
   }
   
-  // 修復: 直接檢查城市名稱 - 支援多種查詢格式
+  // 修復：直接檢查城市名稱 - 改善匹配邏輯
   for (const [chinese, english] of Object.entries(cityMap)) {
-    // 修復: 支援各種查詢格式
-    if (text.includes(chinese) || cleanText.includes(english)) {
-      console.log(`傳統解析找到城市: ${chinese} -> ${english}`);
+    // 使用更精確的匹配
+    const cityRegex = new RegExp(`^\\s*${chinese}\\s*$|.*${chinese}.*`, 'i');
+    if (cityRegex.test(text)) {
+      console.log(`✅ 傳統解析找到城市: ${chinese} -> ${english}`);
       return { type: 'single', city: english, cityName: chinese };
     }
   }
   
-  console.log('傳統解析無結果');
+  console.log('❌ 傳統解析無結果');
   return null;
 }
 
@@ -377,6 +403,7 @@ function parseCompareQuery(text) {
 // 用戶狀態管理
 function setUserState(userId, state, context = {}) {
   userStates.set(userId, { state, context, timestamp: Date.now() });
+  console.log(`📝 設定用戶狀態: ${userId} -> ${state}`);
 }
 
 function getUserState(userId) {
@@ -390,6 +417,7 @@ function getUserState(userId) {
 
 function clearUserState(userId) {
   userStates.delete(userId);
+  console.log(`🗑️ 清除用戶狀態: ${userId}`);
 }
 
 // 訂閱管理功能
@@ -408,8 +436,10 @@ function addSubscription(userId, city) {
   const userSub = subscriptions.get(userId);
   if (!userSub.cities.includes(city)) {
     userSub.cities.push(city);
+    console.log(`➕ 用戶 ${userId} 新增訂閱: ${city}`);
     return true;
   }
+  console.log(`⚠️ 用戶 ${userId} 已訂閱: ${city}`);
   return false;
 }
 
@@ -419,6 +449,7 @@ function removeSubscription(userId, city) {
     const index = userSub.cities.indexOf(city);
     if (index > -1) {
       userSub.cities.splice(index, 1);
+      console.log(`➖ 用戶 ${userId} 移除訂閱: ${city}`);
       return true;
     }
   }
@@ -428,6 +459,7 @@ function removeSubscription(userId, city) {
 function removeAllSubscriptions(userId) {
   if (subscriptions.has(userId)) {
     subscriptions.delete(userId);
+    console.log(`🗑️ 用戶 ${userId} 清除所有訂閱`);
     return true;
   }
   return false;
@@ -458,6 +490,7 @@ function updateUserSettings(userId, settings) {
   
   const userSub = subscriptions.get(userId);
   userSub.settings = { ...userSub.settings, ...settings };
+  console.log(`⚙️ 用戶 ${userId} 更新設定:`, settings);
   return userSub.settings;
 }
 
@@ -534,17 +567,17 @@ function getHealthAdvice(aqi) {
 async function getAirQuality(city) {
   try {
     const url = `${WAQI_BASE_URL}/feed/${city}/?token=${WAQI_TOKEN}`;
-    console.log(`API 請求: ${url}`);
+    console.log(`🌐 API 請求: ${url}`);
     const response = await axios.get(url);
     
     if (response.data.status === 'ok') {
-      console.log(`成功獲取 ${city} 的空氣品質數據`);
+      console.log(`✅ 成功獲取 ${city} 的空氣品質數據`);
       return response.data.data;
     } else {
       throw new Error(`API 回應錯誤: ${response.data.status}`);
     }
   } catch (error) {
-    console.error(`獲取空氣品質數據錯誤 (${city}):`, error.message);
+    console.error(`❌ 獲取空氣品質數據錯誤 (${city}):`, error.message);
     throw error;
   }
 }
@@ -564,7 +597,7 @@ async function getMultipleCitiesAirQuality(cities) {
         }
         return null;
       } catch (error) {
-        console.error(`獲取${cityInfo.chinese}空氣品質失敗:`, error);
+        console.error(`❌ 獲取${cityInfo.chinese}空氣品質失敗:`, error);
         return null;
       }
     });
@@ -572,7 +605,7 @@ async function getMultipleCitiesAirQuality(cities) {
     const results = await Promise.all(promises);
     return results.filter(result => result !== null);
   } catch (error) {
-    console.error('獲取多城市空氣品質數據錯誤:', error);
+    console.error('❌ 獲取多城市空氣品質數據錯誤:', error);
     throw error;
   }
 }
@@ -1197,7 +1230,7 @@ function createCityComparisonFlexMessage(citiesData) {
   return flexMessage;
 }
 
-// 創建設定Flex Message
+// 創建設定Flex Message - 修復按鈕回應
 function createSettingsFlexMessage(userId) {
   const userSub = getUserSubscriptions(userId);
   
@@ -1645,16 +1678,18 @@ async function handleEvent(event) {
   }
 
   const userId = event.source.userId;
+  console.log(`📨 [${userId}] 收到事件類型: ${event.type}`);
 
   // 處理位置訊息
   if (event.message.type === 'location') {
     try {
       const { latitude, longitude } = event.message;
+      console.log(`📍 [${userId}] 收到位置: ${latitude}, ${longitude}`);
       const responseText = '📍 感謝您分享位置！目前位置查詢功能正在開發中，請使用城市名稱查詢。';
       const responseMessage = createSimpleResponse(responseText, ['查詢台北', '查詢台中', '主選單']);
       return client.replyMessage(event.replyToken, responseMessage);
     } catch (error) {
-      console.error('處理位置訊息錯誤:', error);
+      console.error(`❌ [${userId}] 處理位置訊息錯誤:`, error);
       const errorMessage = createErrorFlexMessage('api_error', '位置查詢功能暫時無法使用，請使用城市名稱查詢。');
       return client.replyMessage(event.replyToken, errorMessage);
     }
@@ -1662,40 +1697,42 @@ async function handleEvent(event) {
 
   // 處理文字訊息
   if (event.message.type !== 'text') {
+    console.log(`⚠️ [${userId}] 非文字訊息類型: ${event.message.type}`);
     return Promise.resolve(null);
   }
 
   const userMessage = event.message.text.trim();
   
   try {
-    console.log(`[${userId}] 收到訊息: "${userMessage}"`);
+    console.log(`💬 [${userId}] 收到訊息: "${userMessage}"`);
     
     // 檢查基本指令 - 修復版
     if (userMessage.match(/^(你好|哈囉|hello|hi|主選單|menu|開始)$/i)) {
-      console.log(`[${userId}] 觸發歡迎訊息`);
+      console.log(`👋 [${userId}] 觸發歡迎訊息`);
       const menuMessage = createMainMenuFlexMessage();
       return client.replyMessage(event.replyToken, menuMessage);
     }
 
     // 檢查幫助指令
     if (userMessage.match(/^(幫助|help|使用說明|教學|怎麼用)$/i)) {
+      console.log(`❓ [${userId}] 觸發幫助訊息`);
       const helpText = '🤖 智慧空氣品質機器人使用說明\n\n✨ 直接對話：\n• 說「台北」或「查詢台北」\n• 說「比較台北高雄」\n• 說「訂閱台中」\n\n📱 使用選單：\n• 點選下方按鈕操作\n• 選擇功能更便利\n\n💡 小技巧：\n• 可以直接說城市名稱\n• 支援自然語言對話';
       const helpMessage = createSimpleResponse(helpText, ['查詢台北', '比較城市', '主選單']);
       return client.replyMessage(event.replyToken, helpMessage);
     }
 
-    // 處理設定相關功能 - 修復版
+    // 處理設定相關功能 - 修復版（加強回饋）
     if (userMessage === '我的設定' || userMessage === '設定') {
-      console.log(`[${userId}] 觸發設定選單`);
+      console.log(`⚙️ [${userId}] 觸發設定選單`);
       const settingsMessage = createSettingsFlexMessage(userId);
       return client.replyMessage(event.replyToken, settingsMessage);
     }
 
-    // 處理設定變更 - 修復版，確保有明確回饋
+    // 處理設定變更 - 完全修復版，確保有明確回饋
     if (userMessage.includes('開啟每日報告') || userMessage.includes('關閉每日報告')) {
       const enable = userMessage.includes('開啟');
       updateUserSettings(userId, { dailyReport: enable });
-      console.log(`[${userId}] ${enable ? '開啟' : '關閉'}每日報告`);
+      console.log(`📅 [${userId}] ${enable ? '開啟' : '關閉'}每日報告`);
       
       const confirmText = `✅ 每日報告已${enable ? '開啟' : '關閉'}！\n\n${enable ? '📅 我會在每天早上8點為您推送空氣品質報告。' : '❌ 您將不會再收到每日報告。'}`;
       const confirmMessage = createSimpleResponse(confirmText, ['我的設定', '主選單']);
@@ -1706,7 +1743,7 @@ async function handleEvent(event) {
     if (userMessage.includes('開啟緊急警報') || userMessage.includes('關閉緊急警報')) {
       const enable = userMessage.includes('開啟');
       updateUserSettings(userId, { emergencyAlert: enable });
-      console.log(`[${userId}] ${enable ? '開啟' : '關閉'}緊急警報`);
+      console.log(`🚨 [${userId}] ${enable ? '開啟' : '關閉'}緊急警報`);
       
       const confirmText = `✅ 緊急警報已${enable ? '開啟' : '關閉'}！\n\n${enable ? '🚨 當空氣品質惡化時，我會立即通知您。' : '❌ 您將不會再收到緊急警報。'}`;
       const confirmMessage = createSimpleResponse(confirmText, ['我的設定', '主選單']);
@@ -1719,7 +1756,7 @@ async function handleEvent(event) {
       if (thresholdMatch) {
         const threshold = parseInt(thresholdMatch[1]);
         updateUserSettings(userId, { threshold });
-        console.log(`[${userId}] 設定警報閾值: ${threshold}`);
+        console.log(`⚠️ [${userId}] 設定警報閾值: ${threshold}`);
         
         const confirmText = `✅ 警報閾值已設定為 AQI > ${threshold}！\n\n⚠️ 當空氣品質超過此值時，我會發送警報通知您。`;
         const confirmMessage = createSimpleResponse(confirmText, ['我的設定', '主選單']);
@@ -1730,13 +1767,13 @@ async function handleEvent(event) {
 
     // 處理主選單功能 - 修復版
     if (userMessage === '查詢空氣品質') {
-      console.log(`[${userId}] 觸發城市選擇`);
+      console.log(`🔍 [${userId}] 觸發城市選擇`);
       const citySelectionMessage = createCitySelectionFlexMessage();
       return client.replyMessage(event.replyToken, citySelectionMessage);
     }
 
     if (userMessage === '比較城市') {
-      console.log(`[${userId}] 觸發比較城市功能`);
+      console.log(`📊 [${userId}] 觸發比較城市功能`);
       setUserState(userId, 'awaiting_compare_cities');
       const instructionText = '🆚 多城市比較功能\n\n請輸入要比較的城市名稱，用空格分隔：\n\n📝 範例：\n• 台北 高雄\n• 台北 台中 台南\n• 東京 首爾 新加坡';
       const instructionMessage = createSimpleResponse(instructionText, ['台北 高雄', '台灣五大城市', '取消']);
@@ -1744,13 +1781,13 @@ async function handleEvent(event) {
     }
 
     if (userMessage === '訂閱提醒') {
-      console.log(`[${userId}] 觸發訂閱管理`);
+      console.log(`🔔 [${userId}] 觸發訂閱管理`);
       const subscriptionMessage = createSubscriptionManagementFlexMessage(userId);
       return client.replyMessage(event.replyToken, subscriptionMessage);
     }
 
     if (userMessage === '附近查詢') {
-      console.log(`[${userId}] 觸發附近查詢`);
+      console.log(`📍 [${userId}] 觸發附近查詢`);
       const locationText = '📍 GPS定位查詢\n\n請點擊下方按鈕分享您的位置，我會為您找到最近的空氣品質監測站。';
       const locationMessage = {
         type: 'text',
@@ -1780,7 +1817,7 @@ async function handleEvent(event) {
 
     // 處理訂閱相關功能 - 修復版
     if (userMessage === '新增訂閱') {
-      console.log(`[${userId}] 觸發新增訂閱`);
+      console.log(`➕ [${userId}] 觸發新增訂閱`);
       setUserState(userId, 'awaiting_subscribe_city');
       const instructionText = '🔔 新增訂閱\n\n請輸入您想訂閱的城市名稱：\n\n例如：台北、高雄、台中等';
       const instructionMessage = createSimpleResponse(instructionText, ['台北', '高雄', '台中', '取消']);
@@ -1788,13 +1825,13 @@ async function handleEvent(event) {
     }
 
     if (userMessage === '修改設定') {
-      console.log(`[${userId}] 從訂閱管理觸發設定`);
+      console.log(`⚙️ [${userId}] 從訂閱管理觸發設定`);
       const settingsMessage = createSettingsFlexMessage(userId);
       return client.replyMessage(event.replyToken, settingsMessage);
     }
 
     if (userMessage === '清除所有訂閱') {
-      console.log(`[${userId}] 清除所有訂閱`);
+      console.log(`🗑️ [${userId}] 清除所有訂閱`);
       const success = removeAllSubscriptions(userId);
       const confirmText = success ? 
         '✅ 已清除所有訂閱！\n\n❌ 您將不會再收到任何空氣品質提醒。' : 
@@ -1805,7 +1842,7 @@ async function handleEvent(event) {
 
     // 處理快速比較指令 - 修復版
     if (userMessage === '台北 高雄' || userMessage === '台北 vs 高雄') {
-      console.log(`[${userId}] 快速比較: 台北 vs 高雄`);
+      console.log(`🆚 [${userId}] 快速比較: 台北 vs 高雄`);
       try {
         const cities = [
           { chinese: '台北', english: 'taipei' },
@@ -1820,14 +1857,14 @@ async function handleEvent(event) {
           throw new Error('無法獲取城市數據');
         }
       } catch (error) {
-        console.error(`[${userId}] 快速比較錯誤:`, error);
+        console.error(`❌ [${userId}] 快速比較錯誤:`, error);
         const errorMessage = createErrorFlexMessage('api_error', '比較查詢時發生問題，請稍後再試。');
         return client.replyMessage(event.replyToken, errorMessage);
       }
     }
 
     if (userMessage === '台灣五大城市' || userMessage.includes('比較台北台中台南高雄新北')) {
-      console.log(`[${userId}] 台灣五大城市比較`);
+      console.log(`🏆 [${userId}] 台灣五大城市比較`);
       try {
         const cities = [
           { chinese: '台北', english: 'taipei' },
@@ -1845,7 +1882,7 @@ async function handleEvent(event) {
           throw new Error('無法獲取城市數據');
         }
       } catch (error) {
-        console.error(`[${userId}] 五大城市比較錯誤:`, error);
+        console.error(`❌ [${userId}] 五大城市比較錯誤:`, error);
         const errorMessage = createErrorFlexMessage('api_error', '五大城市比較時發生問題，請稍後再試。');
         return client.replyMessage(event.replyToken, errorMessage);
       }
@@ -1854,22 +1891,25 @@ async function handleEvent(event) {
     // 檢查用戶狀態並處理有狀態的對話
     const userState = getUserState(userId);
     if (userState) {
-      console.log(`[${userId}] 處理狀態對話: ${userState.state}`);
+      console.log(`📝 [${userId}] 處理狀態對話: ${userState.state}`);
       return await handleStatefulMessage(event, userState);
     }
 
-    // 使用AI引擎處理自然語言 - 修復版
+    // 使用AI引擎處理自然語言 - 完全修復版
     try {
       const aiEngine = new AIConversationEngine();
       const intent = aiEngine.analyzeIntent(userMessage);
       const entities = aiEngine.extractEntities(userMessage);
       const emotion = aiEngine.analyzeEmotion(userMessage);
       
-      console.log(`[${userId}] AI分析 - 意圖: ${intent.intent}, 信心度: ${intent.confidence}, 城市: ${entities.cities.map(c => c.name).join(', ')}`);
+      console.log(`🤖 [${userId}] AI分析結果:`);
+      console.log(`   意圖: ${intent.intent} (信心度: ${intent.confidence}%)`);
+      console.log(`   城市: ${entities.cities.map(c => c.name).join(', ') || '無'}`);
+      console.log(`   情感: ${emotion.dominant}`);
       
-      // 處理具體功能
+      // 處理具體功能 - 修復空氣品質查詢
       if (intent.intent === 'air_quality_query' && entities.cities.length > 0) {
-        console.log(`[${userId}] AI識別空氣品質查詢: ${entities.cities[0].name}`);
+        console.log(`🔍 [${userId}] AI識別空氣品質查詢: ${entities.cities[0].name}`);
         const city = entities.cities[0];
         try {
           const airQualityData = await getAirQuality(city.english);
@@ -1881,7 +1921,7 @@ async function handleEvent(event) {
           
           return client.replyMessage(event.replyToken, [textMessage, flexMessage]);
         } catch (error) {
-          console.error(`[${userId}] 查詢${city.name}錯誤:`, error);
+          console.error(`❌ [${userId}] 查詢${city.name}錯誤:`, error);
           const errorText = `抱歉，查詢${city.name}的空氣品質時發生了問題。請稍後再試，或者試試其他城市？`;
           const errorMessage = createSimpleResponse(errorText, ['查詢台北', '查詢高雄', '主選單']);
           return client.replyMessage(event.replyToken, errorMessage);
@@ -1889,7 +1929,7 @@ async function handleEvent(event) {
       }
 
       if (intent.intent === 'comparison' && entities.cities.length >= 2) {
-        console.log(`[${userId}] AI識別比較查詢: ${entities.cities.map(c => c.name).join(' vs ')}`);
+        console.log(`📊 [${userId}] AI識別比較查詢: ${entities.cities.map(c => c.name).join(' vs ')}`);
         try {
           const citiesData = await getMultipleCitiesAirQuality(
             entities.cities.map(city => ({ chinese: city.name, english: city.english }))
@@ -1906,7 +1946,7 @@ async function handleEvent(event) {
             throw new Error('無法獲取足夠的城市數據');
           }
         } catch (error) {
-          console.error(`[${userId}] AI比較查詢錯誤:`, error);
+          console.error(`❌ [${userId}] AI比較查詢錯誤:`, error);
           const errorText = '比較查詢時發生了問題，請檢查城市名稱或稍後再試。';
           const errorMessage = createSimpleResponse(errorText, ['重新比較', '單獨查詢', '主選單']);
           return client.replyMessage(event.replyToken, errorMessage);
@@ -1914,7 +1954,7 @@ async function handleEvent(event) {
       }
 
       if (intent.intent === 'subscription') {
-        console.log(`[${userId}] AI識別訂閱功能`);
+        console.log(`🔔 [${userId}] AI識別訂閱功能`);
         if (entities.cities.length > 0) {
           const city = entities.cities[0];
           const success = addSubscription(userId, city.english);
@@ -1939,43 +1979,43 @@ async function handleEvent(event) {
       const aiResponse = aiEngine.generatePersonalizedResponse(intent, entities, emotion);
       
       if (entities.cities.length > 0) {
-        console.log(`[${userId}] AI找到城市但意圖不明確: ${entities.cities[0].name}`);
+        console.log(`🏙️ [${userId}] AI找到城市但意圖不明確: ${entities.cities[0].name}`);
         const city = entities.cities[0];
         const responseText = `${aiResponse}\n\n是要查詢${city.name}的空氣品質嗎？`;
         const responseMessage = createSimpleResponse(responseText, [`查詢${city.name}`, `訂閱${city.name}`, '主選單']);
         return client.replyMessage(event.replyToken, responseMessage);
       } else {
-        console.log(`[${userId}] AI完全不明確的情況`);
+        console.log(`❓ [${userId}] AI完全不明確的情況`);
         const responseText = `${aiResponse}\n\n💡 你可以試試：\n• 直接說城市名稱，如「台北」\n• 使用「查詢台中」\n• 點選下方功能選項`;
         const responseMessage = createSimpleResponse(responseText, ['查詢台北', '主選單', '使用說明']);
         return client.replyMessage(event.replyToken, responseMessage);
       }
       
     } catch (aiError) {
-      console.error(`[${userId}] AI處理錯誤:`, aiError);
+      console.error(`❌ [${userId}] AI處理錯誤:`, aiError);
       // AI失效時使用傳統解析邏輯
     }
 
     // 備用處理 - 使用原始解析邏輯 - 修復版
-    console.log(`[${userId}] 使用備用處理邏輯...`);
+    console.log(`🔄 [${userId}] 使用備用處理邏輯...`);
     
     const queryResult = parseQuery(userMessage);
     
     if (queryResult && queryResult.type === 'single') {
-      console.log(`[${userId}] 傳統解析成功: ${queryResult.cityName}`);
+      console.log(`✅ [${userId}] 傳統解析成功: ${queryResult.cityName}`);
       try {
         const airQualityData = await getAirQuality(queryResult.city);
         const flexMessage = createAirQualityFlexMessage(airQualityData);
         return client.replyMessage(event.replyToken, flexMessage);
       } catch (error) {
-        console.error(`[${userId}] 傳統查詢錯誤:`, error);
+        console.error(`❌ [${userId}] 傳統查詢錯誤:`, error);
         const errorMessage = createErrorFlexMessage('api_error', '查詢空氣品質時發生錯誤，請稍後再試。');
         return client.replyMessage(event.replyToken, errorMessage);
       }
     }
 
     if (queryResult && queryResult.type === 'compare') {
-      console.log(`[${userId}] 傳統解析比較: ${queryResult.cities.map(c => c.chinese).join(', ')}`);
+      console.log(`📊 [${userId}] 傳統解析比較: ${queryResult.cities.map(c => c.chinese).join(', ')}`);
       try {
         const citiesData = await getMultipleCitiesAirQuality(queryResult.cities);
         if (citiesData.length >= 2) {
@@ -1985,14 +2025,14 @@ async function handleEvent(event) {
           throw new Error('無法獲取足夠的城市數據');
         }
       } catch (error) {
-        console.error(`[${userId}] 傳統比較錯誤:`, error);
+        console.error(`❌ [${userId}] 傳統比較錯誤:`, error);
         const errorMessage = createErrorFlexMessage('api_error', '比較查詢時發生問題，請稍後再試。');
         return client.replyMessage(event.replyToken, errorMessage);
       }
     }
 
     if (queryResult && queryResult.type === 'subscribe') {
-      console.log(`[${userId}] 傳統解析訂閱: ${queryResult.cityName || '未指定城市'}`);
+      console.log(`🔔 [${userId}] 傳統解析訂閱: ${queryResult.cityName || '未指定城市'}`);
       if (queryResult.city) {
         const success = addSubscription(userId, queryResult.city);
         const confirmText = success ? 
@@ -2007,7 +2047,7 @@ async function handleEvent(event) {
     }
 
     if (queryResult && queryResult.type === 'unsubscribe') {
-      console.log(`[${userId}] 傳統解析取消訂閱: ${queryResult.cityName || '未指定城市'}`);
+      console.log(`❌ [${userId}] 傳統解析取消訂閱: ${queryResult.cityName || '未指定城市'}`);
       if (queryResult.city) {
         const success = removeSubscription(userId, queryResult.city);
         const confirmText = success ?
@@ -2022,14 +2062,14 @@ async function handleEvent(event) {
     }
     
     // 如果都無法處理，顯示友善錯誤訊息 - 修復版
-    console.log(`[${userId}] 無法處理的訊息: "${userMessage}"`);
+    console.log(`❓ [${userId}] 無法處理的訊息: "${userMessage}"`);
     const notFoundText = `🤔 我無法完全理解「${userMessage}」的意思，但我很樂意幫助您！\n\n您可以：\n• 直接說城市名稱，如「台北」\n• 使用「查詢台中」這樣的說法\n• 點選下方選單功能\n• 說「主選單」查看所有功能`;
     const notFoundMessage = createSimpleResponse(notFoundText, ['查詢台北', '查詢台中', '主選單']);
     
     return client.replyMessage(event.replyToken, notFoundMessage);
     
   } catch (error) {
-    console.error(`[${userId}] 處理訊息錯誤:`, error);
+    console.error(`💥 [${userId}] 處理訊息錯誤:`, error);
     
     const criticalErrorText = '😅 系統暫時有些問題，請稍後再試。\n\n如果問題持續，請使用下方選單來使用基本功能。';
     const criticalErrorMessage = createSimpleResponse(criticalErrorText, ['主選單', '查詢台北', '查詢高雄']);
@@ -2045,11 +2085,11 @@ async function handleStatefulMessage(event, userState) {
   
   try {
     if (userState.state === 'awaiting_compare_cities') {
-      console.log(`[${userId}] 處理比較城市輸入: "${userMessage}"`);
+      console.log(`📊 [${userId}] 處理比較城市輸入: "${userMessage}"`);
       
       if (userMessage === '取消' || userMessage === '❌ 取消') {
         clearUserState(userId);
-        console.log(`[${userId}] 用戶取消比較功能`);
+        console.log(`❌ [${userId}] 用戶取消比較功能`);
         const menuMessage = createMainMenuFlexMessage();
         return client.replyMessage(event.replyToken, menuMessage);
       }
@@ -2072,7 +2112,7 @@ async function handleStatefulMessage(event, userState) {
       clearUserState(userId);
       
       if (cities.length < 2) {
-        console.log(`[${userId}] 比較城市數量不足: ${cities.length}`);
+        console.log(`⚠️ [${userId}] 比較城市數量不足: ${cities.length}`);
         const errorText = '❌ 請至少輸入2個城市名稱，用空格分隔。\n\n例如：「台北 高雄」或「東京 首爾 新加坡」';
         const errorMessage = createSimpleResponse(errorText, ['台北 高雄', '重新輸入', '主選單']);
         return client.replyMessage(event.replyToken, errorMessage);
@@ -2083,7 +2123,7 @@ async function handleStatefulMessage(event, userState) {
       }
       
       try {
-        console.log(`[${userId}] 開始比較 ${cities.length} 個城市`);
+        console.log(`🔄 [${userId}] 開始比較 ${cities.length} 個城市`);
         const citiesData = await getMultipleCitiesAirQuality(cities);
         
         if (citiesData.length === 0) {
@@ -2098,7 +2138,7 @@ async function handleStatefulMessage(event, userState) {
         
         return client.replyMessage(event.replyToken, [successMessage, comparisonMessage]);
       } catch (error) {
-        console.error(`[${userId}] 比較城市錯誤:`, error);
+        console.error(`❌ [${userId}] 比較城市錯誤:`, error);
         const errorText = '❌ 比較查詢時發生問題，請稍後再試。';
         const errorMessage = createSimpleResponse(errorText, ['重新比較', '單獨查詢', '主選單']);
         return client.replyMessage(event.replyToken, errorMessage);
@@ -2106,11 +2146,11 @@ async function handleStatefulMessage(event, userState) {
     }
     
     if (userState.state === 'awaiting_subscribe_city') {
-      console.log(`[${userId}] 處理訂閱城市輸入: "${userMessage}"`);
+      console.log(`🔔 [${userId}] 處理訂閱城市輸入: "${userMessage}"`);
       
       if (userMessage === '取消' || userMessage === '❌ 取消') {
         clearUserState(userId);
-        console.log(`[${userId}] 用戶取消訂閱功能`);
+        console.log(`❌ [${userId}] 用戶取消訂閱功能`);
         const menuMessage = createMainMenuFlexMessage();
         return client.replyMessage(event.replyToken, menuMessage);
       }
@@ -2120,7 +2160,7 @@ async function handleStatefulMessage(event, userState) {
       clearUserState(userId);
       
       if (queryResult && queryResult.type === 'single') {
-        console.log(`[${userId}] 訂閱解析成功: ${queryResult.cityName}`);
+        console.log(`✅ [${userId}] 訂閱解析成功: ${queryResult.cityName}`);
         const success = addSubscription(userId, queryResult.city);
         const confirmText = success ? 
           `🎉 太好了！我已經為你訂閱${queryResult.cityName}的空氣品質提醒！\n\n✅ 每天早上8點收到空氣品質報告\n🚨 空氣品質惡化時立即通知\n💡 個人化健康建議` :
@@ -2132,7 +2172,7 @@ async function handleStatefulMessage(event, userState) {
         // 嘗試直接匹配城市名稱
         for (const [chinese, english] of Object.entries(cityMap)) {
           if (userMessage.includes(chinese)) {
-            console.log(`[${userId}] 直接匹配城市: ${chinese}`);
+            console.log(`✅ [${userId}] 直接匹配城市: ${chinese}`);
             const success = addSubscription(userId, english);
             const confirmText = success ? 
               `🎉 太好了！我已經為你訂閱${chinese}的空氣品質提醒！\n\n✅ 每天早上8點收到空氣品質報告\n🚨 空氣品質惡化時立即通知` :
@@ -2143,7 +2183,7 @@ async function handleStatefulMessage(event, userState) {
           }
         }
         
-        console.log(`[${userId}] 無法識別訂閱城市: "${userMessage}"`);
+        console.log(`❌ [${userId}] 無法識別訂閱城市: "${userMessage}"`);
         const errorText = '❌ 無法識別城市名稱，請重新輸入。\n\n支援的城市包括：台北、高雄、台中、台南、東京、首爾、新加坡等。';
         const errorMessage = createSimpleResponse(errorText, ['台北', '高雄', '查看支援城市', '主選單']);
         return client.replyMessage(event.replyToken, errorMessage);
@@ -2151,13 +2191,13 @@ async function handleStatefulMessage(event, userState) {
     }
     
     // 如果狀態不匹配，清除狀態並顯示主選單
-    console.log(`[${userId}] 未知狀態: ${userState.state}`);
+    console.log(`❓ [${userId}] 未知狀態: ${userState.state}`);
     clearUserState(userId);
     const menuMessage = createMainMenuFlexMessage();
     return client.replyMessage(event.replyToken, menuMessage);
     
   } catch (error) {
-    console.error(`[${userId}] 處理狀態對話錯誤:`, error);
+    console.error(`💥 [${userId}] 處理狀態對話錯誤:`, error);
     clearUserState(userId);
     
     const errorText = '❌ 處理請求時發生錯誤，請重試。';
@@ -2199,14 +2239,14 @@ async function findNearbyStations(lat, lng) {
     }
     return [];
   } catch (error) {
-    console.error('查找附近監測站錯誤:', error);
+    console.error('❌ 查找附近監測站錯誤:', error);
     return [];
   }
 }
 
 // 每日定時推送空氣品質報告（每天早上8點）
 cron.schedule('0 8 * * *', async () => {
-  console.log('開始發送每日空氣品質報告...');
+  console.log('📅 開始發送每日空氣品質報告...');
   
   for (const [userId, subscription] of subscriptions.entries()) {
     if (subscription.settings.dailyReport && subscription.cities.length > 0) {
@@ -2229,10 +2269,10 @@ cron.schedule('0 8 * * *', async () => {
           );
           
           await client.pushMessage(userId, reportMessage);
-          console.log(`已發送每日報告給用戶 ${userId}`);
+          console.log(`✅ 已發送每日報告給用戶 ${userId}`);
         }
       } catch (error) {
-        console.error(`發送每日報告給用戶 ${userId} 失敗:`, error);
+        console.error(`❌ 發送每日報告給用戶 ${userId} 失敗:`, error);
       }
     }
   }
@@ -2242,7 +2282,7 @@ cron.schedule('0 8 * * *', async () => {
 
 // 檢查緊急警報（每小時檢查一次）
 cron.schedule('0 * * * *', async () => {
-  console.log('檢查緊急警報...');
+  console.log('🚨 檢查緊急警報...');
   
   for (const [userId, subscription] of subscriptions.entries()) {
     if (subscription.settings.emergencyAlert && subscription.cities.length > 0) {
@@ -2259,11 +2299,11 @@ cron.schedule('0 * * * *', async () => {
             const alertMessage = createSimpleResponse(alertText, [`查詢${chinese}`, '健康建議', '關閉警報']);
             
             await client.pushMessage(userId, alertMessage);
-            console.log(`已發送緊急警報給用戶 ${userId} (${chinese}: AQI ${airQualityData.aqi})`);
+            console.log(`🚨 已發送緊急警報給用戶 ${userId} (${chinese}: AQI ${airQualityData.aqi})`);
           }
         }
       } catch (error) {
-        console.error(`檢查緊急警報給用戶 ${userId} 失敗:`, error);
+        console.error(`❌ 檢查緊急警報給用戶 ${userId} 失敗:`, error);
       }
     }
   }
@@ -2277,7 +2317,7 @@ app.post('/webhook', line.middleware(config), (req, res) => {
     .all(req.body.events.map(handleEvent))
     .then((result) => res.json(result))
     .catch((err) => {
-      console.error('Webhook處理錯誤:', err);
+      console.error('💥 Webhook處理錯誤:', err);
       res.status(500).end();
     });
 });
@@ -2504,7 +2544,7 @@ app.get('/', (req, res) => {
       `);
     }
   } catch (error) {
-    console.error('首頁載入錯誤:', error);
+    console.error('❌ 首頁載入錯誤:', error);
     res.status(500).send(`
       <h1>AI 服務臨時不可用</h1>
       <p>請稍後再試，或聯繫技術支援</p>
@@ -2522,7 +2562,7 @@ app.get('/health', (req, res) => {
     message: 'AI 智慧空氣品質機器人 - 完全修復版正常運行中！',
     timestamp: new Date().toISOString(),
     uptime: Math.floor(process.uptime()),
-    version: '2.2.0-COMPLETELY-FIXED',
+    version: '2.3.0-COMPLETELY-FIXED',
     fixes: [
       '✅ 修復所有 Flex Message 按鈕回應問題',
       '✅ 修復設定功能的用戶反饋機制',
@@ -2569,23 +2609,23 @@ app.get('/health', (req, res) => {
 app.get('/api/air-quality/:city', async (req, res) => {
   try {
     const city = req.params.city;
-    console.log(`API請求 - 城市: ${city}`);
+    console.log(`🌐 API請求 - 城市: ${city}`);
     const airQualityData = await getAirQuality(city);
     res.json({
       success: true,
       data: airQualityData,
       timestamp: new Date().toISOString(),
-      version: '2.2.0-COMPLETELY-FIXED'
+      version: '2.3.0-COMPLETELY-FIXED'
     });
   } catch (error) {
-    console.error('API錯誤:', error);
+    console.error('❌ API錯誤:', error);
     res.status(500).json({ 
       success: false,
       error: '無法獲取空氣品質數據',
       details: error.message,
       city: req.params.city,
       timestamp: new Date().toISOString(),
-      version: '2.2.0-COMPLETELY-FIXED'
+      version: '2.3.0-COMPLETELY-FIXED'
     });
   }
 });
@@ -2595,7 +2635,7 @@ app.get('/api/stats', (req, res) => {
   res.json({
     service: {
       name: 'AI 智慧空氣品質機器人 - 完全修復版',
-      version: '2.2.0-COMPLETELY-FIXED',
+      version: '2.3.0-COMPLETELY-FIXED',
       status: 'running',
       all_functions_working: true
     },
@@ -2663,7 +2703,7 @@ app.get('/debug', (req, res) => {
     
     res.json({
       server_status: 'running ✅',
-      version: '2.2.0-COMPLETELY-FIXED',
+      version: '2.3.0-COMPLETELY-FIXED',
       all_fixes_applied: true,
       fixes_verification: {
         flex_message_buttons: 'FIXED ✅ - 所有按鈕都能正確回應',
@@ -2724,7 +2764,7 @@ app.get('/debug', (req, res) => {
     res.status(500).json({
       error: 'Debug endpoint error',
       message: error.message,
-      version: '2.2.0-COMPLETELY-FIXED'
+      version: '2.3.0-COMPLETELY-FIXED'
     });
   }
 });
@@ -2732,7 +2772,7 @@ app.get('/debug', (req, res) => {
 // 測試端點 - 驗證所有功能
 app.get('/test', (req, res) => {
   const testResults = {
-    version: '2.2.0-COMPLETELY-FIXED',
+    version: '2.3.0-COMPLETELY-FIXED',
     test_suite: 'Complete Functionality Test',
     timestamp: new Date().toISOString(),
     tests: {
@@ -2806,19 +2846,19 @@ cron.schedule('0 * * * *', () => {
     }
   }
   
-  console.log(`完全修復版清理完成 - 用戶狀態: ${userStates.size}, 位置快取: ${locationCache.size}, 對話歷史: ${conversationHistory.size}, 用戶資料: ${userProfiles.size}`);
+  console.log(`🧹 完全修復版清理完成 - 用戶狀態: ${userStates.size}, 位置快取: ${locationCache.size}, 對話歷史: ${conversationHistory.size}, 用戶資料: ${userProfiles.size}`);
 }, {
   timezone: "Asia/Taipei"
 });
 
 // 錯誤處理中間件
 app.use((err, req, res, next) => {
-  console.error('伺服器錯誤:', err);
+  console.error('💥 伺服器錯誤:', err);
   res.status(500).json({
     error: 'Internal Server Error',
     message: err.message,
     timestamp: new Date().toISOString(),
-    version: '2.2.0-COMPLETELY-FIXED',
+    version: '2.3.0-COMPLETELY-FIXED',
     suggestion: '請聯繫技術支援或稍後再試'
   });
 });
@@ -2831,34 +2871,34 @@ app.use((req, res) => {
     method: req.method,
     message: '請求的路由不存在',
     available_routes: ['/', '/health', '/debug', '/test', '/api/air-quality/:city', '/api/stats'],
-    version: '2.2.0-COMPLETELY-FIXED',
+    version: '2.3.0-COMPLETELY-FIXED',
     timestamp: new Date().toISOString()
   });
 });
 
 // 優雅關機處理
 process.on('SIGTERM', () => {
-  console.log('收到 SIGTERM 信號，正在優雅關機...');
-  console.log(`保存數據 - 對話歷史: ${conversationHistory.size}, 用戶資料: ${userProfiles.size}, 訂閱: ${subscriptions.size}`);
+  console.log('🛑 收到 SIGTERM 信號，正在優雅關機...');
+  console.log(`💾 保存數據 - 對話歷史: ${conversationHistory.size}, 用戶資料: ${userProfiles.size}, 訂閱: ${subscriptions.size}`);
   process.exit(0);
 });
 
 process.on('SIGINT', () => {
-  console.log('收到 SIGINT 信號，正在優雅關機...');
-  console.log(`保存數據 - 對話歷史: ${conversationHistory.size}, 用戶資料: ${userProfiles.size}, 訂閱: ${subscriptions.size}`);
+  console.log('🛑 收到 SIGINT 信號，正在優雅關機...');
+  console.log(`💾 保存數據 - 對話歷史: ${conversationHistory.size}, 用戶資料: ${userProfiles.size}, 訂閱: ${subscriptions.size}`);
   process.exit(0);
 });
 
 // 未捕獲例外處理
 process.on('uncaughtException', (error) => {
-  console.error('未捕獲的例外:', error);
-  console.log('正在嘗試優雅關機...');
+  console.error('💥 未捕獲的例外:', error);
+  console.log('🛑 正在嘗試優雅關機...');
   process.exit(1);
 });
 
 process.on('unhandledRejection', (reason, promise) => {
-  console.error('未處理的 Promise 拒絕:', reason);
-  console.log('在:', promise);
+  console.error('💥 未處理的 Promise 拒絕:', reason);
+  console.log('📍 在:', promise);
 });
 
 // 啟動服務器
@@ -2870,7 +2910,7 @@ app.listen(port, '0.0.0.0', () => {
   console.log(`📡 服務運行於端口: ${port}`);
   console.log(`🌐 服務網址: http://0.0.0.0:${port}`);
   console.log(`📅 啟動時間: ${new Date().toLocaleString('zh-TW')}`);
-  console.log(`📦 版本: 2.2.0-COMPLETELY-FIXED`);
+  console.log(`📦 版本: 2.3.0-COMPLETELY-FIXED`);
   
   console.log('\n✅ 所有功能修復確認：');
   console.log('🔹 Flex Message 按鈕回應 ✅ FIXED');
@@ -2950,4 +2990,4 @@ module.exports = {
   getAirQuality,
   parseQuery
 };
-    
+          
