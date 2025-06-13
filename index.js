@@ -5,6 +5,29 @@ const cron = require('node-cron');
 
 const app = express();
 
+// 新增根路徑處理 - 解決 Render 部署問題
+app.get('/', (req, res) => {
+  res.status(200).json({
+    status: 'ok',
+    service: 'Smart Air Quality LINE Bot',
+    version: '3.0.0',
+    timestamp: new Date().toISOString(),
+    endpoints: {
+      webhook: '/webhook',
+      health: '/health'
+    }
+  });
+});
+
+// 健康檢查端點
+app.get('/health', (req, res) => {
+  res.status(200).json({ 
+    status: 'healthy',
+    uptime: process.uptime(),
+    timestamp: new Date().toISOString()
+  });
+});
+
 // LINE Bot 設定
 const config = {
   channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN,
@@ -830,6 +853,7 @@ async function handleEvent(event) {
   }
   
   const userMessage = event.message.text.trim();
+  console.log(`[${new Date().toISOString()}] User ${userId}: ${userMessage}`);
   
   // 檢查是否有等待中的狀態
   const userState = getUserState(userId);
@@ -943,17 +967,6 @@ app.post('/webhook', line.middleware(config), (req, res) => {
     });
 });
 
-// 健康檢查
-app.get('/health', (req, res) => {
-  res.status(200).json({ status: 'ok' });
-});
-
-// 啟動伺服器
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`🚀 Server is running on port ${PORT}`);
-});
-
 // 每日報告定時任務 (早上8點)
 cron.schedule('0 8 * * *', async () => {
   console.log('📅 Running daily report task...');
@@ -977,6 +990,52 @@ cron.schedule('0 8 * * *', async () => {
       console.error(`Daily report error for ${userId}:`, error);
     }
   }
+});
+
+// 錯誤處理中間件
+app.use((err, req, res, next) => {
+  console.error('Express error:', err);
+  res.status(500).json({ error: 'Internal Server Error' });
+});
+
+// 404 處理
+app.use((req, res) => {
+  res.status(404).json({ 
+    error: 'Not Found',
+    message: 'The requested endpoint does not exist.',
+    availableEndpoints: ['/', '/webhook', '/health']
+  });
+});
+
+// 啟動伺服器 - 修正 Render 部署問題
+const PORT = process.env.PORT || 3000;
+const HOST = '0.0.0.0'; // 重要：綁定到所有網路介面
+
+const server = app.listen(PORT, HOST, () => {
+  console.log(`🚀 Server is running on ${HOST}:${PORT}`);
+  console.log(`✅ Server started successfully at ${new Date().toISOString()}`);
+  console.log(`📌 Environment: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`🔗 Endpoints: /webhook (POST), /health (GET), / (GET)`);
+});
+
+// 優雅關閉處理
+process.on('SIGTERM', () => {
+  console.log('SIGTERM signal received: closing HTTP server');
+  server.close(() => {
+    console.log('HTTP server closed');
+    process.exit(0);
+  });
+});
+
+// 處理未捕獲的異常
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught Exception:', err);
+  process.exit(1);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+  process.exit(1);
 });
 
 // 匯出模組
