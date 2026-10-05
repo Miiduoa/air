@@ -8,14 +8,19 @@ concurrency:
   group: air-monitor-test-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 jobs:
   python:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
-          python-version: '3.13'
+          python-version: "3.13"
+      - run: python -m compileall -q cli.py pipeline_cli.py src
       - run: python -m unittest discover -s tests -v
       - run: python cli.py sample/readings.jsonl --lat 24.1477 --lon 120.6736 --now 2026-10-05T08:00:00+00:00
+      - run: python pipeline_cli.py sample/pipeline_readings.jsonl --now 2026-10-05T08:00:00+00:00 --min-accepted-ratio 0.5 --quarantine-out /tmp/quarantine.jsonl
