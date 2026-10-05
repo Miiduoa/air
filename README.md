@@ -1,87 +1,150 @@
-# air｜IoT Sensor Network Monitor
+# air｜IoT sensor data pipeline
 
-一個用來檢查環境感測站資料品質與可用性的輕量工具。
+[![test](https://github.com/Miiduoa/air/actions/workflows/test.yml/badge.svg)](https://github.com/Miiduoa/air/actions/workflows/test.yml)
 
-這個 repo 原本是一個展示型空氣品質聊天機器人，包含模擬 AQI 對話與大量前端展示。現在把重點改成更實際的問題：
+感測器 API 有回資料，不代表資料可以直接拿來算。
 
-**感測站資料到底能不能用？**
+這個 repo 把原本的空氣品質展示程式整理成一個小型 IoT data pipeline：先逐筆 ingest、驗證、quarantine，再根據健康資料做地理選站與摘要；同時輸出 pipeline health 指標，讓「資料現在到底能不能用」可以被監控。
 
-目前會檢查：
+## Pipeline
 
-- 座標是否合法
-- PM2.5 數值是否落在合理資料範圍
-- 資料是否過期
-- 同一站同一時間是否重複上報
-- 指定位置附近，哪一個可用站點最近
-- 可用站點 PM2.5 的 median summary
+```text
+JSONL input
+   ↓
+row-level parse
+   ├─ malformed → quarantine
+   ↓
+schema / range / timestamp checks
+   ├─ invalid → quarantine
+   ↓
+duplicate detection
+   ├─ duplicate → quarantine
+   ↓
+accepted readings
+   ├─ nearest healthy station
+   ├─ median PM2.5
+   └─ pipeline metrics / health
+```
 
-## 為什麼這樣做
+## Row-level quarantine
 
-IoT 系統不是「API 回到資料」就算完成。實際使用前至少要先回答：
+以前 `load_jsonl` 遇到一筆壞 JSON 會 fail fast。這在小工具很合理，但實際 ingestion pipeline 通常不希望第 351 筆壞資料讓前 350 筆與後面所有資料一起消失。
 
-- 這筆資料多久以前的？
-- 感測值是不是明顯錯誤？
-- 同一筆是不是重複送進來？
-- 使用者附近最近的站有沒有健康資料？
-- 單一站點異常時，整體摘要會不會被拉歪？
+`run_jsonl_pipeline` 會把壞資料隔離，其他可用 row 繼續處理。
 
-所以這個版本刻意不做假即時資訊，也不直接給健康建議。
+目前 quarantine 原因包含：
 
-## 快速執行
+- JSON / schema parse error
+- station id 缺失
+- latitude / longitude 不合法
+- PM2.5 超出 sanity range
+- timestamp 沒 timezone
+- timestamp 在未來
+- reading stale
+- station + timestamp 重複
 
-不需要第三方套件。
+## Observability
+
+每次 pipeline 會輸出：
+
+- `input_lines`
+- `parsed_total`
+- `accepted_total`
+- `quarantined_total`
+- `malformed_total`
+- `stale_total`
+- `duplicate_total`
+- `future_total`
+- `invalid_coordinate_total`
+- `invalid_pm25_total`
+- `accepted_ratio`
+- `healthy_station_ratio`
+- `latest_lag_minutes`
+
+並依門檻標成：
+
+- `healthy`
+- `degraded`
+- `unhealthy`
+
+這些是 pipeline health，不是空氣品質健康建議。
+
+## Privacy / data minimization
+
+Quarantine 檔不複製原始 JSON row，只保存：
+
+```json
+{
+  "line_number": 4,
+  "station_id": null,
+  "reason": "parse error: JSONDecodeError",
+  "raw_sha256": "..."
+}
+```
+
+這樣可以確認同一筆壞資料是否重複出現，又不必額外複製整份原始 payload。
+
+## Run
+
+原本的 network summary：
+
+```bash
+python cli.py sample/readings.jsonl \
+  --lat 24.1477 \
+  --lon 120.6736 \
+  --now 2026-10-05T08:00:00+00:00
+```
+
+Pipeline mode：
+
+```bash
+python pipeline_cli.py sample/pipeline_readings.jsonl \
+  --now 2026-10-05T08:00:00+00:00 \
+  --quarantine-out tmp/quarantine.jsonl
+```
+
+Exit code：
+
+- `0`：healthy
+- `1`：degraded
+- `2`：unhealthy
+
+因此可以直接拿來做 scheduled data-quality check 或 CI fixture。
+
+## Existing network checks
+
+健康資料仍可用來：
+
+- 找指定位置最近的可用站點（Haversine）
+- 計算健康站點 PM2.5 median
+- 排除 stale / duplicate / invalid reading
+
+PM2.5 的 `0–1000 µg/m³` 只是資料 sanity range，不是健康分級。
+
+## Tests
 
 ```bash
 python -m unittest discover -s tests -v
-python cli.py sample/readings.jsonl --lat 24.1477 --lon 120.6736 --now 2026-10-05T08:00:00+00:00
 ```
 
-輸出會包含：
+測試包含：
 
-- 總筆數
-- 可用／不可用筆數
-- 資料錯誤
-- 最近可用站點
-- 距離
-- median PM2.5
+- 座標與 freshness
+- duplicate detection
+- nearest healthy station
+- median
+- malformed row 不拖垮整批
+- duplicate rows quarantine
+- degraded / unhealthy health classification
+- freshness lag
+- quarantine 不保存 raw payload
 
-## 資料格式
+## Scope
 
-```json
-{"station_id":"TC001","lat":24.1477,"lon":120.6736,"pm25":18.2,"observed_at":"2026-10-05T07:40:00+00:00"}
-```
+這是 ingestion / data quality / observability 練習，不宣稱接了政府即時資料，也不提供醫療或空氣品質健康建議。
 
-## 規則
+目前是單檔 JSONL pipeline。真的進入 streaming / high-volume 場景時，才值得加入 object storage、stream broker、warehouse 與 metrics backend。
 
-目前示範規則：
+## License
 
-- latitude：-90 ～ 90
-- longitude：-180 ～ 180
-- PM2.5：0 ～ 1000 µg/m³
-- 預設資料有效期限：60 分鐘
-
-這裡的 PM2.5 上限是資料 sanity check，不是健康分級標準。
-
-## 專案結構
-
-```text
-src/air_monitor/
-  model.py
-  geo.py
-  quality.py
-  service.py
-cli.py
-sample/
-tests/
-.github/workflows/test.yml
-```
-
-## 限制
-
-- 範例資料是合成資料
-- 沒有連接政府即時資料源
-- 沒有 AQI 換算與健康建議
-- 沒有處理感測器校正與漂移模型
-- nearest station 只用球面距離，不考慮實際道路或地形
-
-這個作品要展示的是 IoT 資料品質與地理選站邏輯，不是把 demo 包裝成即時監測服務。
+MIT
